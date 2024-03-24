@@ -1,5 +1,7 @@
 package network;
 
+import locator.LocatorController;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 
@@ -10,14 +12,13 @@ import java.net.ServerSocket;
  * TODO: how is mediated the connection between the locator and the client (if required)? TCP/UDP?
  */
 public class LocatorNetwork implements Runnable {
-    private final String ipAddress;
+    // private final String ipAddress;
     private final int port;
     private ServerSocket serverSocket;
+    private LocatorController locatorController;
 
-    // TODO: maybe, an instance to the locator's controller is required.
-
-    public LocatorNetwork (String ipAddress, int port) {
-        this.ipAddress = ipAddress;
+    public LocatorNetwork (LocatorController locatorController, int port) {
+        this.locatorController = locatorController;
         this.port = port;
     }
 
