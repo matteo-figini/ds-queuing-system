@@ -1,7 +1,7 @@
 package main;
 
 import locator.LocatorController;
-import network.LocatorNetwork;
+import locator.LocatorNetwork;
 
 import java.util.Scanner;
 
@@ -16,6 +16,7 @@ public class LocatorMain {
 
         LocatorController locatorController = new LocatorController();
         LocatorNetwork locatorNetwork = new LocatorNetwork(locatorController, locatorPort);
+        locatorController.setLocatorNetwork(locatorNetwork);
         Thread thread = new Thread(locatorNetwork);
         thread.start();
     }

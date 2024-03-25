@@ -1,8 +1,9 @@
-package network;
+package locator;
 
 import locator.LocatorController;
 
 import java.io.IOException;
+import java.net.Inet4Address;
 import java.net.ServerSocket;
 
 /**
@@ -12,7 +13,6 @@ import java.net.ServerSocket;
  * TODO: how is mediated the connection between the locator and the client (if required)? TCP/UDP?
  */
 public class LocatorNetwork implements Runnable {
-    // private final String ipAddress;
     private final int port;
     private ServerSocket serverSocket;
     private LocatorController locatorController;
@@ -30,7 +30,8 @@ public class LocatorNetwork implements Runnable {
     public void run() {
         try {
             this.serverSocket = new ServerSocket(this.port);
-            System.out.println("Locator's network running on port " + this.port + " via TCP socket connection.");
+            System.out.println("Locator's network running on " + Inet4Address.getLocalHost().getHostAddress() +
+                    ":" + this.port + " via TCP socket connection.");
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to start the locator's server socket.");
             System.out.println(e.getMessage());
