@@ -1,4 +1,4 @@
-package Raft;
+package raft;
 
 /**
  * These values represent the possible states in which raft nodes can be.
