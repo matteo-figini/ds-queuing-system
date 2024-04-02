@@ -3,38 +3,61 @@ import raft.messages.VoteRequest;
 import raft.messages.VoteResponse;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Objects;
 
 public class RaftNode {
+
+    /** Number of nodes in the raft network, decided at compile time */
+    private final Integer NUM_NODES = 5;
+
     /** Used to distinguish node*/
     private Integer nodeId;
+
     /** List of nodeId of the other nodes in the network*/
     private ArrayList<Integer> nodesList;
+
     private NodeState currentRole = NodeState.FOLLOWER;
+
     private Integer currentTerm = 0;
+
     /** Id of the node we last have voted for*/
     private Integer votedFor = 0;
+
     /** Log of the node*/
     private ArrayList<LogItem> log = new ArrayList<>();
+
     /** TODO */
     private Integer commitLength = 0;
+
     /** Id of the current leader node*/
     private Integer currentLeader = 0;
+
     /** Votes received by this node during the election*/
     private ArrayList<Integer> votesReceived = new ArrayList<>();
-    // TODO
-    private ArrayList<Integer> sentLength = new ArrayList<Integer>();
-    // TODO
-    private ArrayList<Integer> ackedLength = new ArrayList<Integer>();
+
+    /**
+     * Number of log records that we have already sent to a particular node.
+     * The key is the nodeId of the receiving node, the value is the actual length.
+     */
+    private HashMap<Integer, Integer> sentLength = new HashMap<>();
+
+    /**
+     * Number of log entries that a particular node acknowledged as having received.
+     * The key is the nodeId of the node sending acks, the value is the actual number.
+     */
+    private HashMap<Integer, Integer> ackedLength = new HashMap<>();
 
     public RaftNode(Integer nodeId, ArrayList<Integer> nodesList) {
-        // TODO: remove, only for testing
-        System.out.println("Node started, thread id: " + Thread.currentThread().getId());
 
+        // TODO: are these assertions needed?
         if(nodeId <= 0)
         {
-            // TODO: remove
             throw new RuntimeException("nodeId should be >0");
+        }
+        if(NUM_NODES % 2 == 0 || NUM_NODES < 3)
+        {
+            throw new RuntimeException("NUM_NODES should be and odd number >1");
         }
 
         this.nodeId = nodeId;
@@ -104,6 +127,8 @@ public class RaftNode {
         currentTerm += 1;
         currentRole = NodeState.CANDIDATE;
         votedFor = nodeId;
+
+        votesReceived.clear(); // TODO: I added this, is it actually needed?
         votesReceived.add(nodeId);
 
         Integer lastTerm = 0;
@@ -147,21 +172,73 @@ public class RaftNode {
         // True if this node voted for this candidate or none
         boolean votedForOk = votedFor == null || votedFor.equals(voteReq.cId); // TODO: is `null` consistent?
 
+        boolean vote;
         if(voteReq.cTerm.equals(currentTerm) && logOk && votedForOk)
         {
             votedFor = voteReq.cId;
-
-            // TODO
-            // reply(new VoteResponse(nodeId, currentTerm, true));
-            throw new UnsupportedOperationException();
+            vote = true;
         }
         else
         {
-            // TODO
-            // reply(new VoteResponse(nodeId, currentTerm, false));
-            throw new UnsupportedOperationException();
+            vote = false;
         }
 
+        // TODO
+//        reply(new VoteResponse(nodeId, currentTerm, vote), cId); // send reply to candidateId
+        throw new UnsupportedOperationException();
+    }
 
+    /**
+     * This function handles the vote response message received from another node.
+     *
+     * @param voteReply The vote response message object.
+     */
+    private void onVoteResponse(VoteResponse voteReply)
+    {
+        final Integer voterId = voteReply.voterId;
+        final Integer term = voteReply.voterCurrentTerm;
+        final boolean vote = voteReply.vote;
+
+        if(currentRole == NodeState.CANDIDATE && Objects.equals(term, currentTerm) && vote)
+        {
+            votesReceived.add(voterId);
+
+            if(votesReceived.size() >= (NUM_NODES + 1) / 2)
+            {
+                // Election won
+                currentRole = NodeState.LEADER;
+                currentLeader = nodeId;
+
+                // TODO: cancel election timer
+                if(true)
+                {
+                    // The "if" is needed to ignore the "unreachable statement" error while
+                    // waiting to implement the timer election functionality
+                    throw new UnsupportedOperationException();
+                }
+
+                for(Integer followerId : nodesList)
+                {
+                    if(followerId != nodeId)
+                    {
+                        sentLength.put(followerId, log.size());
+                        ackedLength.put(followerId, 0);
+
+                        // TODO
+//                        replicateLog();
+                        throw new UnsupportedOperationException();
+                    }
+                }
+            }
+        }
+        else if(term > currentTerm)
+        {
+            // Found a node with a higher term number
+            currentTerm = term;
+            currentRole = NodeState.FOLLOWER;
+            votedFor = null;
+            // TODO: cancel election timer
+            throw new UnsupportedOperationException();
+        }
     }
 }
