@@ -5,12 +5,12 @@ import locator.LocatorController;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.ServerSocket;
+import java.net.Socket;
 
 /**
  * This class handles all the network communication by the locator component.
  * The communication between the locator and the brokers is mediated via TCP protocol,
  * ensuring persistent connection.
- * TODO: how is mediated the connection between the locator and the client (if required)? TCP/UDP?
  */
 public class LocatorNetwork implements Runnable {
     private final int port;
@@ -38,7 +38,14 @@ public class LocatorNetwork implements Runnable {
         }
 
         while (!Thread.currentThread().isInterrupted()) {
-            // TODO: listen to new incoming connection
+            try {
+                Socket brokerSocket = serverSocket.accept();
+                System.out.println("New connection request from: " + brokerSocket.getInetAddress());
+                // Until this point, both clients and brokers may connect to the locator.
+
+            } catch (IOException e) {
+                System.out.println("[EXCEPTION] " + e.getMessage());
+            }
         }
     }
 }
