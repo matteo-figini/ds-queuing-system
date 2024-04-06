@@ -24,13 +24,13 @@ public class LocatorNetwork implements Runnable {
 
     /**
      * Creates a thread that constantly listens to on the {@code ServerSocket}.
-     * When a new (client or) broker asks for the connection, a new {@code } is created.
+     * When a new (client or) broker asks for the connection, a new {@code ClientHandler} is created.
      */
     @Override
     public void run() {
         try {
             this.serverSocket = new ServerSocket(this.port);
-            System.out.println("Locator's network running on " + Inet4Address.getLocalHost().getHostAddress() +
+            System.out.println("[INFO] Locator's network running on " + Inet4Address.getLocalHost().getHostAddress() +
                     ":" + this.port + " via TCP socket connection.");
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to start the locator's server socket.");
@@ -39,10 +39,11 @@ public class LocatorNetwork implements Runnable {
 
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                Socket brokerSocket = serverSocket.accept();
-                System.out.println("New connection request from: " + brokerSocket.getInetAddress());
-                // Until this point, both clients and brokers may connect to the locator.
-
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("[INFO] New connection request from: " + clientSocket.getInetAddress());
+                ClientHandler clientHandler = new ClientHandler(this, clientSocket);
+                Thread thread = new Thread(clientHandler);
+                thread.start();
             } catch (IOException e) {
                 System.out.println("[EXCEPTION] " + e.getMessage());
             }
