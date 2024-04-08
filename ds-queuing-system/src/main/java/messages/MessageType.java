@@ -1,4 +1,4 @@
-package raft.messages;
+package messages;
 
 /**
  * This enum represents all the possible types of messages used in the

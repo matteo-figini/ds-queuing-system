@@ -1,4 +1,7 @@
-package raft.messages;
+package messages.application;
+
+import messages.Message;
+import messages.MessageType;
 
 /**
  * This class represents a vote request message, sent by a candidate to a follower.

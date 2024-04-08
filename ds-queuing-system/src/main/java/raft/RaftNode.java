@@ -1,6 +1,6 @@
 package raft;
-import raft.messages.VoteRequest;
-import raft.messages.VoteResponse;
+import messages.application.VoteRequest;
+import messages.application.VoteResponse;
 
 import java.util.ArrayList;
 import java.util.HashMap;

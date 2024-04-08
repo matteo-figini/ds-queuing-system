@@ -1,5 +1,7 @@
 package locator;
 
+import messages.Message;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -40,13 +42,42 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    /**
+     * This method runs the thread of the client handler.
+     * The role of the thread is to continuous listening to the socket port when new messages arrive
+     * and send them to the locator.
+     */
     @Override
     public void run() {
-        System.out.println("[INFO] Established connection with " + clientSocket.getInetAddress().toString());
+        System.out.println("[INFO] Established connection with " + clientSocket.getInetAddress());
 
         while (!Thread.currentThread().isInterrupted()) {
+            synchronized (inputLockObject) {
+                Message message = null;
+                try {
+                    message = (Message) inputStream.readObject();
+                    System.out.println("[INFO] Received message: " + message.toString());
+                } catch (IOException | ClassNotFoundException e) {
+                    System.out.println("[EXCEPTION] " + e.getMessage());
+                    try {
+                        clientSocket.close();
+                    } catch (IOException ex) {
+                        System.out.println("[EXCEPTION] Unable to close the socket: " + ex.getMessage());
+                    }
+                    this.isConnected = false;
+                    Thread.currentThread().interrupt();
+                }
 
+                if (message != null) {
+                    // TODO: handle the message to the locator.
+                }
+            }
         }
-
+        // TODO: handle the client disconnection from the locator side
+        try {
+            clientSocket.close();
+        } catch (IOException e) {
+            System.out.println("[EXCEPTION] Unable to close the socket: " + e.getMessage());
+        }
     }
 }

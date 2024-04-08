@@ -17,8 +17,8 @@ public class BrokerMain {
         BrokerController brokerController = new BrokerController();
         BrokerNetwork brokerNetwork = new BrokerNetwork(brokerController, locatorIPAddress, locatorPort);
         brokerController.setBrokerNetwork(brokerNetwork);
-        Thread thread = new Thread(brokerNetwork);
-        thread.start();
+        /*Thread thread = new Thread(brokerNetwork);
+        thread.start();*/
     }
 
     public static String askIPAddress () {

@@ -1,7 +1,5 @@
 package locator;
 
-import locator.LocatorController;
-
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.ServerSocket;
@@ -13,10 +11,20 @@ import java.net.Socket;
  * ensuring persistent connection.
  */
 public class LocatorNetwork implements Runnable {
+    /** Port on which the locator has the {@code ServerSocket} open. */
     private final int port;
-    private ServerSocket serverSocket;
-    private LocatorController locatorController;
 
+    /** {@code ServerSocket} on which the locator is listening for new incoming connections. */
+    private ServerSocket serverSocket;
+
+    /** Reference to the {@code LocatorController}. */
+    private final LocatorController locatorController;
+
+    /**
+     * Set the default parameters needed for running the locator.
+     * @param locatorController Reference to the {@code LocatorController} - it must be already instantiated.
+     * @param port Port on which the {@code ServerSocket} will be open.
+     */
     public LocatorNetwork (LocatorController locatorController, int port) {
         this.locatorController = locatorController;
         this.port = port;
@@ -37,10 +45,14 @@ public class LocatorNetwork implements Runnable {
             System.out.println(e.getMessage());
         }
 
+        // Keeps listening on the ServerSocket.
+        // Every time a new node connects to the ServerSocket,
+        // instantiate and run the corresponding ClientHandler.
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("[INFO] New connection request from: " + clientSocket.getInetAddress());
+                System.out.println("[INFO] New connection request from: " + clientSocket.getInetAddress() +
+                        " on port " + clientSocket.getPort());
                 ClientHandler clientHandler = new ClientHandler(this, clientSocket);
                 Thread thread = new Thread(clientHandler);
                 thread.start();
@@ -49,4 +61,8 @@ public class LocatorNetwork implements Runnable {
             }
         }
     }
+
+
+
+    // TODO: add methods for adding the new client, to handle the client disconnection and the arrive of a message.
 }
