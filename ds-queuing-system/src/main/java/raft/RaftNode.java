@@ -4,9 +4,10 @@ import messages.application.VoteResponse;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Objects;
 
-public class RaftNode {
+public class RaftNode<T> {
 
     /** Number of nodes in the raft network, decided at compile time */
     private final Integer NUM_NODES = 5;
@@ -25,7 +26,7 @@ public class RaftNode {
     private Integer votedFor = 0;
 
     /** Log of the node*/
-    private ArrayList<LogItem> log = new ArrayList<>();
+    private ArrayList<LogItem<T>> log = new ArrayList<>();
 
     /** TODO */
     private Integer commitLength = 0;
@@ -240,5 +241,66 @@ public class RaftNode {
             // TODO: cancel election timer
             throw new UnsupportedOperationException();
         }
+    }
+
+    /**
+     * This function is used to append data to the log and propagate it to the followers.
+     *
+     * ATTENTION: this function doesn't cover the case where the followers can forward
+     * append requests to the leader. We assume that clients communicate only with the leader,
+     * thus only the leader should be able to handle such requests.
+     *
+     * @param newItem The Item to be added to the log.
+     */
+    public void onAppendMessage(LogItem<T> newItem)
+    {
+        // TODO: remove this check
+        if(currentRole != NodeState.LEADER)
+        {
+            throw new RuntimeException("Error, this function should be called only on the leader node");
+        }
+
+        log.add(newItem);
+
+        // Update ackedLength of the leader
+        ackedLength.put(nodeId, log.size());
+
+        for(Integer followerId : nodesList)
+        {
+            if(!Objects.equals(followerId, nodeId)) // Avoid leader sending to himself
+            {
+                replicateLog(followerId);
+            }
+        }
+    }
+
+    /**
+     * Called on the leader whenever there is a new message in the log, and also
+     * periodically. If there are no new messages, suffix is the empty list, serving
+     * as heartbeats.
+     *
+     * @param followerId The id of the follower that will receive the message.
+     */
+    private void replicateLog(Integer followerId)
+    {
+        // TODO: remove this check
+        if(currentRole != NodeState.LEADER)
+        {
+            throw new RuntimeException("Error, this function should be called only on the leader node");
+        }
+
+        int prefixLen = sentLength.get(followerId);
+
+        List<LogItem<T>> suffix = log.subList(prefixLen, log.size());
+
+        int prefixTerm = 0;
+        if(prefixLen > 0)
+        {
+            prefixTerm = log.get(prefixLen - 1).term;
+        }
+
+        // TODO
+        // send() to followerId
+        throw new UnsupportedOperationException();
     }
 }
