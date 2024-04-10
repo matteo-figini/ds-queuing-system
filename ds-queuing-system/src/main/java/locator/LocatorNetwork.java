@@ -1,5 +1,7 @@
 package locator;
 
+import messages.Message;
+
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.ServerSocket;
@@ -32,7 +34,7 @@ public class LocatorNetwork implements Runnable {
 
     /**
      * Creates a thread that constantly listens to on the {@code ServerSocket}.
-     * When a new (client or) broker asks for the connection, a new {@code ClientHandler} is created.
+     * When a new (client or) broker asks for the connection, a new {@code NodeHandler} is created.
      */
     @Override
     public void run() {
@@ -47,14 +49,14 @@ public class LocatorNetwork implements Runnable {
 
         // Keeps listening on the ServerSocket.
         // Every time a new node connects to the ServerSocket,
-        // instantiate and run the corresponding ClientHandler.
+        // instantiate and run the corresponding NodeHandler.
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("[INFO] New connection request from: " + clientSocket.getInetAddress() +
                         " on port " + clientSocket.getPort());
-                ClientHandler clientHandler = new ClientHandler(this, clientSocket);
-                Thread thread = new Thread(clientHandler);
+                NodeHandler nodeHandler = new NodeHandler(this, clientSocket);
+                Thread thread = new Thread(nodeHandler);
                 thread.start();
             } catch (IOException e) {
                 System.out.println("[EXCEPTION] " + e.getMessage());
@@ -62,7 +64,12 @@ public class LocatorNetwork implements Runnable {
         }
     }
 
+    public void onMessageReceived (Message message) {
+        System.out.println("[INFO] " + message);
+    }
 
-
-    // TODO: add methods for adding the new client, to handle the client disconnection and the arrive of a message.
+    // TODO: add methods for adding the new client, to handle the client disconnection.
+    public void addNewConnectedNode () {
+        locatorController.addNewConnectedNode(null);
+    }
 }

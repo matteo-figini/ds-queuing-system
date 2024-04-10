@@ -13,25 +13,29 @@ public class BrokerMain {
         // Ask the user the address and the port of the locator
         String locatorIPAddress = askIPAddress();
         int locatorPort = askPort();
+        String brokerName = askBrokerName();
 
-        BrokerController brokerController = new BrokerController();
+        BrokerController brokerController = new BrokerController(brokerName);
         BrokerNetwork brokerNetwork = new BrokerNetwork(brokerController, locatorIPAddress, locatorPort);
         brokerController.setBrokerNetwork(brokerNetwork);
-        /*Thread thread = new Thread(brokerNetwork);
-        thread.start();*/
+        brokerController.startCommunicationGreetings();
     }
 
     public static String askIPAddress () {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Insert the locator's IP address: ");
-        String ipAddress = scanner.nextLine();
-        return ipAddress;
+        System.out.print("Insert the locator's IP address: ");
+        return scanner.nextLine();
     }
 
     public static int askPort () {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Insert the locator's port: ");
-        int port = Integer.parseInt(scanner.nextLine());
-        return port;
+        System.out.print("Insert the locator's port: ");
+        return Integer.parseInt(scanner.nextLine());
+    }
+
+    public static String askBrokerName () {
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Insert the broker's name: ");
+        return scanner.nextLine();
     }
 }

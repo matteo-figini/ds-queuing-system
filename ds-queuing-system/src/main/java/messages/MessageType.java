@@ -10,4 +10,8 @@ public enum MessageType
     VOTE_REQUEST,
     /** Reply to a vote request, sent by a follower to the candidate */
     VOTE_RESPONSE,
+
+    /* ---------- NETWORK MESSAGES ---------- */
+    HELLO_REQUEST,
+
 }

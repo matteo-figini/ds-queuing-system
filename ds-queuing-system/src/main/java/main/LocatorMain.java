@@ -17,12 +17,12 @@ public class LocatorMain {
         Scanner scanner = new Scanner(System.in);
 
         // Insert the port on which the locator is listening to
-        System.out.println("Locator's port: ");
+        System.out.print("Locator's port: ");
         int locatorPort = Integer.parseInt(scanner.nextLine());
 
         // Insert the number of brokers allowed in the network
         do {
-            System.out.println("Number of brokers in the network: ");
+            System.out.print("Number of brokers in the network: ");
             brokers = Integer.parseInt(scanner.nextLine());
         } while (brokers <= 1 || brokers % 2 == 0);
 

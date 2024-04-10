@@ -1,5 +1,7 @@
 package broker;
 
+import messages.Message;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -12,20 +14,17 @@ import java.net.Socket;
  * to every other broker already instantiated as a "client" and keeps listening to a port for new brokers,
  * acting as a "server".
  */
-public class BrokerNetwork implements Runnable {
-    private final String locatorIPAddress;
-    private final int locatorPort;
+public class BrokerNetwork {
 
+    // Locator's connection
     private Socket socketToLocator; /** Socket for the connection with the locator. */
     private ObjectInputStream locatorSocketIS;  /** Input stream for the socket to the locator. */
     private ObjectOutputStream locatorSocketOS; /** Output stream for the socket to the locator. */
 
-    private BrokerController brokerController;
+    private final BrokerController brokerController;
 
     public BrokerNetwork(BrokerController controller, String locatorIPAddress, int locatorPort) {
         this.brokerController = controller;
-        this.locatorIPAddress = locatorIPAddress;
-        this.locatorPort = locatorPort;
 
         try {
             socketToLocator = new Socket();
@@ -37,8 +36,17 @@ public class BrokerNetwork implements Runnable {
         }
     }
 
-    @Override
-    public void run() {
-        System.out.println("Running thread...");
+    /**
+     * Sends the message specified as parameter to the locator.
+     * If an {@code IOException} occurs, the broker will be disconnected from the server.
+     * @param message The message to be sent.
+     */
+    public void sendMessageToLocator (Message message) {
+        try {
+            this.locatorSocketOS.writeObject(message);
+            this.locatorSocketOS.reset();
+        } catch (IOException e) {
+            e.printStackTrace(); // TODO: to be replaced with the effective disconnection.
+        }
     }
 }

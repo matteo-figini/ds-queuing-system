@@ -13,24 +13,22 @@ import java.net.Socket;
  * as a "client" - referring to the TCP terminology - from the point of view of the
  * locator.
  */
-public class ClientHandler implements Runnable {
+public class NodeHandler implements Runnable {
     private final Socket clientSocket;
     private final LocatorNetwork locatorNetwork;
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
-    private boolean isConnected = true;
     private final Object inputLockObject;
     private final Object outputLockObject;
 
     /**
-     * This constructor creates a socket ClientHandler which will manage by thread every single client connection.
+     * This constructor creates a socket NodeHandler which will manage by thread every single client connection.
      * @param locatorNetwork The current instance of the locator's network.
      * @param clientSocket The current instance of the socket with the client.
      */
-    public ClientHandler(LocatorNetwork locatorNetwork, Socket clientSocket) {
+    public NodeHandler(LocatorNetwork locatorNetwork, Socket clientSocket) {
         this.clientSocket = clientSocket;
         this.locatorNetwork = locatorNetwork;
-        this.isConnected = true;
         this.inputLockObject = new Object();
         this.outputLockObject = new Object();
 
@@ -51,6 +49,7 @@ public class ClientHandler implements Runnable {
     public void run() {
         System.out.println("[INFO] Established connection with " + clientSocket.getInetAddress());
 
+
         while (!Thread.currentThread().isInterrupted()) {
             synchronized (inputLockObject) {
                 Message message = null;
@@ -64,11 +63,11 @@ public class ClientHandler implements Runnable {
                     } catch (IOException ex) {
                         System.out.println("[EXCEPTION] Unable to close the socket: " + ex.getMessage());
                     }
-                    this.isConnected = false;
                     Thread.currentThread().interrupt();
                 }
 
                 if (message != null) {
+                    locatorNetwork.onMessageReceived(message);
                     // TODO: handle the message to the locator.
                 }
             }
@@ -80,4 +79,24 @@ public class ClientHandler implements Runnable {
             System.out.println("[EXCEPTION] Unable to close the socket: " + e.getMessage());
         }
     }
+
+    /**
+     * Sends a message to the client on the {@code ObjectOutputStream}.
+     * @param message The message to send to the client.
+     */
+    public void sendMessage (Message message) {
+        try {
+            synchronized (outputLockObject) {
+                System.out.println("[INFO] Sending message: " + message.toString() + ", to node: " + clientSocket.getInetAddress());
+                outputStream.writeObject(message);
+                outputStream.reset();
+                System.out.println("[INFO] Message sent.");
+            }
+        } catch (IOException e) {
+            System.out.println("[EXCEPTION] Unable to send message: " + message);
+            // TODO: disconnect the node
+        }
+    }
+
+
 }
