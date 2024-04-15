@@ -1,4 +1,6 @@
 package raft;
+import messages.application.LogRequest;
+import messages.application.LogResponse;
 import messages.application.VoteRequest;
 import messages.application.VoteResponse;
 
@@ -149,7 +151,7 @@ public class RaftNode<T> {
      *
      * @param voteReq The vote request message object.
      */
-    private void onVoteRequest(VoteRequest voteReq)
+    private void onVoteRequest(final VoteRequest voteReq)
     {
         final Integer cLogLastTerm = voteReq.cLogLastTerm;
         final Integer cLogLength = voteReq.cLogLength;
@@ -194,7 +196,7 @@ public class RaftNode<T> {
      *
      * @param voteReply The vote response message object.
      */
-    private void onVoteResponse(VoteResponse voteReply)
+    private void onVoteResponse(final VoteResponse voteReply)
     {
         final Integer voterId = voteReply.voterId;
         final Integer term = voteReply.voterCurrentTerm;
@@ -252,7 +254,7 @@ public class RaftNode<T> {
      *
      * @param newItem The Item to be added to the log.
      */
-    public void onAppendMessage(LogItem<T> newItem)
+    public void onAppendMessage(final LogItem<T> newItem)
     {
         // TODO: remove this check
         if(currentRole != NodeState.LEADER)
@@ -302,5 +304,97 @@ public class RaftNode<T> {
         // TODO
         // send() to followerId
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * This function is used to handle log messages received from the leader. The followers
+     * check if their logs are consistent with the leader. If so they append the new data
+     * to their logs, otherwise they signal it to the leader in order to retrieve the missing
+     * data.
+     *
+     * @param logRequest The message received from the leader.
+     */
+    public void onLogMessage(final LogRequest<T> logRequest)
+    {
+        if(logRequest.term > currentTerm)
+        {
+            currentTerm = logRequest.term;
+            votedFor = null; // TODO: is it consistent?
+
+            // TODO: cancel election timer
+            throw new UnsupportedOperationException();
+        }
+
+        if(logRequest.term == currentTerm)
+        {
+            currentRole = NodeState.FOLLOWER;
+            currentLeader = logRequest.leaderId;
+        }
+
+        final Integer prefixLen = logRequest.prefixLen;
+        final boolean logOk = (log.size() >= prefixLen) &&
+                (prefixLen == 0 || log.get(prefixLen - 1).term == logRequest.prefixTerm);
+        if(logRequest.term == currentTerm && logOk)
+        {
+            appendEntries(prefixLen, logRequest.leaderCommit, logRequest.suffix);
+
+            final Integer ack = logRequest.prefixLen + logRequest.suffix.size();
+            // TODO: send operation successful to leader
+            // send(new LogResponse(nodeId, currentTerm, ack, true));
+            throw new UnsupportedOperationException();
+        }
+        else
+        {
+            // TODO: send operation failed to leader
+            // send(new LogResponse(nodeId, currentTerm, 0, false));
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /**
+     * Utility function that handles the insertion of new entries in
+     * the follower's log.
+     *
+     * @param prefixLen Number of entries already inserted in the follower's log.
+     * @param leaderCommit The number of entries committed by the leader.
+     * @param suffix The list containing the entries to be added.
+     */
+    private void appendEntries(Integer prefixLen, Integer leaderCommit, List<LogItem<T>> suffix)
+    {
+        // TODO: this function should be called only by followers?
+        //  Should I add an assertion for testing?
+
+        if(suffix.size() > 0 && log.size() > prefixLen)
+        {
+            int index = Math.min(log.size(), prefixLen + suffix.size()) - 1;
+            if(log.get(index).term != suffix.get(index - prefixLen).term)
+            {
+                // log is inconsistent, keep only until prefixLen
+                // TODO: is it correct? the slides say to keep until `prefixLen - 1` included?
+                log = new ArrayList<>(log.subList(0, prefixLen));
+            }
+        }
+
+        if(prefixLen + suffix.size() > log.size())
+        {
+            for(int i = log.size() - prefixLen; i < suffix.size(); i++)
+            {
+                log.add(suffix.get(i));
+            }
+        }
+
+        if(leaderCommit > commitLength)
+        {
+            // TODO: is this part (the whole commit part) needed? Or we can assume that
+            //  messages are delivered instantaneously to the application?
+
+            for(int i = commitLength; i < leaderCommit; i++)
+            {
+                // deliver log[i].msg to the application
+                throw new UnsupportedOperationException();
+            }
+
+            commitLength = leaderCommit;
+        }
     }
 }
