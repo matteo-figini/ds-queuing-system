@@ -314,7 +314,7 @@ public class RaftNode<T> {
      *
      * @param logRequest The message received from the leader.
      */
-    public void onLogMessage(final LogRequest<T> logRequest)
+    public void onLogRequest(final LogRequest<T> logRequest)
     {
         if(logRequest.term > currentTerm)
         {
@@ -395,6 +395,75 @@ public class RaftNode<T> {
             }
 
             commitLength = leaderCommit;
+        }
+    }
+
+    /**
+     * This function is used to handle log response messages sent by the followers to the
+     * leader.
+     *
+     * @param logResponse The response message.
+     */
+    public void onLogResponse(final LogResponse logResponse)
+    {
+        if(logResponse.term == currentTerm && currentRole == NodeState.LEADER)
+        {
+            if(logResponse.outcome && logResponse.ack >= ackedLength.get(logResponse.nodeId))
+            {
+                sentLength.put(logResponse.nodeId, logResponse.ack);
+                ackedLength.put(logResponse.nodeId, logResponse.ack);
+
+                commitLogEntries(); // TODO: is this part (the whole commit part) needed?
+            }
+            else if(sentLength.get(logResponse.nodeId) > 0)
+            {
+                sentLength.put(logResponse.nodeId, sentLength.get(logResponse.nodeId) - 1);
+                replicateLog(logResponse.nodeId);
+            }
+        }
+        else if(logResponse.term > currentTerm)
+        {
+            currentTerm = logResponse.term;
+            currentRole = NodeState.FOLLOWER;
+            votedFor = null; // TODO: is it consistent?
+            // TODO: cancel election timer
+            throw  new UnsupportedOperationException();
+        }
+    }
+
+    /**
+     * Utility function that checks if any of the new log entries have been acknowledged
+     * by a quorum of nodes. When the log entry is committed its message is delivered to
+     * the application.
+     */
+    private void commitLogEntries()
+    {
+        // Note: the code of this function was taken from the video, not from the pdf
+
+        boolean keepGoing = true;
+
+        while(commitLength < log.size() && keepGoing)
+        {
+            int acks = 0;
+            for(Integer node : nodesList)
+            {
+                if(ackedLength.get(node) > commitLength)
+                {
+                    acks++;
+                }
+            }
+
+            if(acks > (nodesList.size() + 1) / 2)
+            {
+                // TODO: deliver log[commitLength].msg to the application
+                if(true)
+                    throw new UnsupportedOperationException();
+                commitLength++;
+            }
+            else
+            {
+                keepGoing = false;
+            }
         }
     }
 }
