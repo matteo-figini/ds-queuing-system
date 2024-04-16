@@ -17,5 +17,7 @@ public enum MessageType
 
     /* ---------- NETWORK MESSAGES ---------- */
     HELLO_REQUEST,
-
+    HELLO_RESPONSE,
+    NET_DISCOVERY_REQUEST,
+    NET_DISCOVERY_RESPONSE
 }

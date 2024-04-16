@@ -17,7 +17,6 @@ import java.util.concurrent.Executors;
  * acting as a "server".
  */
 public class BrokerNetwork {
-
     // Locator's connection
     private Socket socketToLocator; /** Socket for the connection with the locator. */
     private ObjectInputStream locatorSocketIS;  /** Input stream for the socket to the locator. */
@@ -28,7 +27,6 @@ public class BrokerNetwork {
 
     public BrokerNetwork(BrokerController controller, String locatorIPAddress, int locatorPort) {
         this.brokerController = controller;
-
         try {
             socketToLocator = new Socket();
             socketToLocator.connect(new InetSocketAddress(locatorIPAddress, locatorPort));

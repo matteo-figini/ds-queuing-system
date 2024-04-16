@@ -2,6 +2,8 @@ package broker;
 
 import messages.Message;
 import messages.network.HelloRequestMessage;
+import messages.network.HelloResponseMessage;
+import messages.network.NetDiscoveryRequestMessage;
 
 /**
  * This class represents the main element of a broker, managing all the underlying logic
@@ -25,6 +27,7 @@ public class BrokerController {
 
     public void setBrokerNetwork(BrokerNetwork brokerNetwork) {
         this.brokerNetwork = brokerNetwork;
+        brokerNetwork.readMessageFromLocator();
     }
 
     /**
@@ -32,6 +35,13 @@ public class BrokerController {
      * @param message The message received.
      */
     public void update (Message message) {
-
+        switch (message.type) {
+            case HELLO_RESPONSE -> {
+                HelloResponseMessage helloResponseMessage = (HelloResponseMessage) message;
+                if (helloResponseMessage.isConnectionAccepted()) {
+                    brokerNetwork.sendMessageToLocator(new NetDiscoveryRequestMessage());
+                }
+            }
+        }
     }
 }

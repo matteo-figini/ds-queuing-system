@@ -1,6 +1,8 @@
 package locator;
 
 import messages.Message;
+import messages.MessageType;
+import messages.network.HelloRequestMessage;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -14,6 +16,7 @@ import java.net.Socket;
  * locator.
  */
 public class NodeHandler implements Runnable {
+    // Network attributes
     private final Socket clientSocket;
     private final LocatorNetwork locatorNetwork;
     private ObjectInputStream inputStream;
@@ -66,9 +69,13 @@ public class NodeHandler implements Runnable {
                     Thread.currentThread().interrupt();
                 }
 
+                // If the message is valid, handle it.
                 if (message != null) {
-                    locatorNetwork.onMessageReceived(message);
-                    // TODO: handle the message to the locator.
+                    if (message.type == MessageType.HELLO_REQUEST) {
+                        locatorNetwork.onHelloRequestMessageReceived((HelloRequestMessage) message, this);
+                    } else {
+                        locatorNetwork.onMessageReceived(message);
+                    }
                 }
             }
         }

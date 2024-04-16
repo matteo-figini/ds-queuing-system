@@ -1,6 +1,7 @@
 package locator;
 
 import messages.Message;
+import messages.network.HelloRequestMessage;
 
 import java.io.IOException;
 import java.net.Inet4Address;
@@ -64,12 +65,22 @@ public class LocatorNetwork implements Runnable {
         }
     }
 
+    /**
+     * Handles a {@code HelloRequestMessage} received from one of the nodes.
+     * @param message {@code HelloRequestMessage} containing information about the connecting node.
+     * @param nodeHandler {@code NodeHandler} referencing that specific node from the locator's side.
+     */
+    public void onHelloRequestMessageReceived (HelloRequestMessage message, NodeHandler nodeHandler) {
+        locatorController.addNode(message, nodeHandler);
+    }
+
+    /**
+     * Handles a generic message received from one of the connected nodes.
+     * @param message The message received from the locator.
+     */
     public void onMessageReceived (Message message) {
         locatorController.onMessageReceived(message);
     }
 
-    // TODO: add methods for adding the new client, to handle the client disconnection.
-    public void addNewConnectedNode () {
-        locatorController.addNewConnectedNode(null);
-    }
+
 }
