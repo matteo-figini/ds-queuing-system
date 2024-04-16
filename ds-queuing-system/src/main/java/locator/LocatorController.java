@@ -33,7 +33,8 @@ public class LocatorController {
      */
     public void onMessageReceived (Message message) {
         switch (message.type) {
-            case HELLO_REQUEST -> System.out.println("Suca!");
+            case HELLO_REQUEST:
+                System.out.println("[INFO] Received Hello Request at LocatorController");
         }
     }
 

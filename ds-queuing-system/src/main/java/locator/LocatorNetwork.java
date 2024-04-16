@@ -65,7 +65,7 @@ public class LocatorNetwork implements Runnable {
     }
 
     public void onMessageReceived (Message message) {
-        System.out.println("[INFO] " + message);
+        locatorController.onMessageReceived(message);
     }
 
     // TODO: add methods for adding the new client, to handle the client disconnection.

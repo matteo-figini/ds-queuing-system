@@ -1,5 +1,6 @@
 package broker;
 
+import messages.Message;
 import messages.network.HelloRequestMessage;
 
 /**
@@ -7,14 +8,12 @@ import messages.network.HelloRequestMessage;
  * and acting as a mediator between the application layer and the network layer.
  */
 public class BrokerController {
-
     /** Name of the broker. */
     private final String brokerName;
-
     /** Reference to the {@code BrokerNetwork}. */
     private BrokerNetwork brokerNetwork;
 
-    public BrokerController(String brokerName) {
+    public BrokerController (String brokerName) {
         this.brokerName = brokerName;
     }
 
@@ -28,5 +27,11 @@ public class BrokerController {
         this.brokerNetwork = brokerNetwork;
     }
 
+    /**
+     * Receives a message from the {@code BrokerNetwork} and process it, based on the message type.
+     * @param message The message received.
+     */
+    public void update (Message message) {
 
+    }
 }

@@ -7,6 +7,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * This class handles the aspects related to the network interface of a single broker.
@@ -20,6 +22,7 @@ public class BrokerNetwork {
     private Socket socketToLocator; /** Socket for the connection with the locator. */
     private ObjectInputStream locatorSocketIS;  /** Input stream for the socket to the locator. */
     private ObjectOutputStream locatorSocketOS; /** Output stream for the socket to the locator. */
+    private final ExecutorService readFromLocatorService = Executors.newSingleThreadExecutor();
 
     private final BrokerController brokerController;
 
@@ -48,5 +51,21 @@ public class BrokerNetwork {
         } catch (IOException e) {
             e.printStackTrace(); // TODO: to be replaced with the effective disconnection.
         }
+    }
+
+    public void readMessageFromLocator () {
+        readFromLocatorService.execute(() -> {
+            while (!readFromLocatorService.isShutdown()) {
+                Message message;
+                try {
+                    message = (Message) locatorSocketIS.readObject();
+                } catch (IOException | ClassNotFoundException e) {
+                    // TODO: handle disconnection from the locator
+                    message = null;
+                    readFromLocatorService.shutdownNow();
+                }
+                brokerController.update(message);
+            }
+        });
     }
 }
