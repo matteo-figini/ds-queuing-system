@@ -13,14 +13,29 @@ import java.util.List;
  * broker, also that broker is present in the list, so it is the responsibility of the broker to take care of the result.
  */
 public class NetDiscoveryResponseMessage extends Message {
+    /** List of brokers actually connected to the locator. */
     private final List<NodeReference> brokersConnected;
 
+    /**
+     * Create the {@code NetDiscoveryResponseMessage}.
+     * @param brokersConnected List of brokers actually connected to the locator.
+     */
     public NetDiscoveryResponseMessage(List<NodeReference> brokersConnected) {
         super(MessageType.NET_DISCOVERY_RESPONSE);
         this.brokersConnected = new ArrayList<NodeReference>(brokersConnected);
     }
 
+    /**
+     * @return A reference to the list of brokers.
+     */
     public List<NodeReference> getBrokersConnected() {
         return brokersConnected;
+    }
+
+    @Override
+    public String toString() {
+        return "NetDiscoveryResponseMessage{" +
+                "brokersConnected=" + brokersConnected +
+                '}';
     }
 }

@@ -78,8 +78,8 @@ public class LocatorNetwork implements Runnable {
      * Handles a generic message received from one of the connected nodes.
      * @param message The message received from the locator.
      */
-    public void onMessageReceived (Message message) {
-        locatorController.onMessageReceived(message);
+    public void onMessageReceived (Message message, NodeHandler sender) {
+        locatorController.onMessageReceived(message, sender);
     }
 
 

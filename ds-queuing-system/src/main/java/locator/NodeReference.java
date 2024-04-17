@@ -1,24 +1,32 @@
 package locator;
 
+import java.io.Serializable;
+
 /**
  * This class represents a description of a node reference from the point of view of the locator.
  * Every connected node has its reference to the {@code NodeHandler} class, a {@code String} representing
  * the node name and a boolean flag indicating whether the node is a broker or not (True if the node is broker,
  * False if the node is a client.
  */
-public class NodeReference {
-    private NodeHandler nodeHandler;
+public class NodeReference implements Serializable {
+    private String ipAddress;
+    private int publicPort;
     private String nodeName;
     private boolean isBroker;
 
-    public NodeReference(NodeHandler nodeHandler, String nodeName, boolean isBroker) {
-        this.nodeHandler = nodeHandler;
+    public NodeReference(String ipAddress, int publicPort, String nodeName, boolean isBroker) {
+        this.publicPort = publicPort;
+        this.ipAddress = ipAddress;
         this.nodeName = nodeName;
         this.isBroker = isBroker;
     }
 
-    public NodeHandler getNodeHandler() {
-        return nodeHandler;
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public int getPublicPort() {
+        return publicPort;
     }
 
     public String getNodeName() {
@@ -32,7 +40,8 @@ public class NodeReference {
     @Override
     public String toString() {
         return "NodeReference{" +
-                "nodeHandler=" + nodeHandler +
+                "ipAddress='" + ipAddress + '\'' +
+                ", publicPort=" + publicPort +
                 ", nodeName='" + nodeName + '\'' +
                 ", isBroker=" + isBroker +
                 '}';

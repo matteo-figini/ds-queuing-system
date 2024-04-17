@@ -1,0 +1,35 @@
+@startuml
+
+title Broker Initialization - High Level Procedure
+
+participant Broker as B
+participant Locator as L
+
+activate B
+B -> L: Connect (IP, port)
+activate L
+L --> B: Connection accepted
+note over B
+Open a ServerSocket to keeps listening
+to new connection from other brokers
+end note
+B -> L: HelloRequestMessage (IPAddress, publicPort, nodeName, isBroker = true)
+alt numBrokers < maxBrokers
+L --> B: HelloResponseMessage (connectionAccepted = true)
+else numBrokers >= maxBrokers
+L --> B: HelloResponseMessage (connectionAccepted = false)
+note over L
+In this case, both locator
+and brokers must close the connection
+end note
+end
+B -> L: NetDiscoverRequestMessage
+note over L
+For every brokers already connected,
+send the name, the IP address and the port
+end note
+L --> B: NetDiscoverResponseMessage (List<Brokers>)
+deactivate L
+deactivate B
+
+@enduml

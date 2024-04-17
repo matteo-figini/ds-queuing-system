@@ -7,6 +7,7 @@ import messages.network.HelloRequestMessage;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.net.Socket;
 
 /**
@@ -74,7 +75,7 @@ public class NodeHandler implements Runnable {
                     if (message.type == MessageType.HELLO_REQUEST) {
                         locatorNetwork.onHelloRequestMessageReceived((HelloRequestMessage) message, this);
                     } else {
-                        locatorNetwork.onMessageReceived(message);
+                        locatorNetwork.onMessageReceived(message, this);
                     }
                 }
             }
@@ -100,10 +101,13 @@ public class NodeHandler implements Runnable {
                 System.out.println("[INFO] Message sent.");
             }
         } catch (IOException e) {
-            System.out.println("[EXCEPTION] Unable to send message: " + message);
+            e.printStackTrace();
+            System.out.println("[EXCEPTION] Unable to send message: " + e.getMessage());
             // TODO: disconnect the node
         }
     }
 
-
+    public Socket getClientSocket() {
+        return clientSocket;
+    }
 }

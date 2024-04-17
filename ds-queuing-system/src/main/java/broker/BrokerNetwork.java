@@ -7,6 +7,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -18,11 +19,15 @@ import java.util.concurrent.Executors;
  */
 public class BrokerNetwork {
     // Locator's connection
-    private Socket socketToLocator; /** Socket for the connection with the locator. */
-    private ObjectInputStream locatorSocketIS;  /** Input stream for the socket to the locator. */
-    private ObjectOutputStream locatorSocketOS; /** Output stream for the socket to the locator. */
+    private Socket socketToLocator;
+    private ObjectInputStream locatorSocketIS;
+    private ObjectOutputStream locatorSocketOS;
     private final ExecutorService readFromLocatorService = Executors.newSingleThreadExecutor();
 
+    // Other connections
+    private BrokerServerSocket brokerServerSocket;
+
+    // Reference to the broker's controller.
     private final BrokerController brokerController;
 
     public BrokerNetwork(BrokerController controller, String locatorIPAddress, int locatorPort) {
@@ -32,6 +37,7 @@ public class BrokerNetwork {
             socketToLocator.connect(new InetSocketAddress(locatorIPAddress, locatorPort));
             locatorSocketIS = new ObjectInputStream(socketToLocator.getInputStream());
             locatorSocketOS = new ObjectOutputStream(socketToLocator.getOutputStream());
+            startBrokerServerSocket();
         } catch (IOException e) {
             System.out.println("[EXCEPTION] " + e.getMessage());
         }
@@ -51,6 +57,9 @@ public class BrokerNetwork {
         }
     }
 
+    /**
+     * Starts and execute the routine that keeps listening to new incoming messages from the locator.
+     */
     public void readMessageFromLocator () {
         readFromLocatorService.execute(() -> {
             while (!readFromLocatorService.isShutdown()) {
@@ -65,5 +74,24 @@ public class BrokerNetwork {
                 brokerController.update(message);
             }
         });
+    }
+
+    /**
+     * Ask the user the public port on which the broker's server socket will run and instantiate the
+     * {@code BrokerServerSocket}.
+     */
+    private void startBrokerServerSocket() {
+        System.out.print("Insert the public port on which the broker will listen to new connections: ");
+        int publicPort = Integer.parseInt(new Scanner(System.in).nextLine());
+        this.brokerServerSocket = new BrokerServerSocket(publicPort, this);
+        Thread thread = new Thread(brokerServerSocket);
+        thread.start();
+    }
+
+    /**
+     * @return The broker's public port.
+     */
+    public int getBrokerPublicPort () {
+        return brokerServerSocket.getPublicPort();
     }
 }
