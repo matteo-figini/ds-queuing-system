@@ -63,6 +63,10 @@ public class BrokerController {
                     HelloResponseMessage helloResponseMessage = (HelloResponseMessage) message;
                     if (helloResponseMessage.isConnectionAccepted()) {
                         brokerNetwork.sendMessageToLocator(new NetDiscoveryRequestMessage());
+                    } else {
+                        System.out.println("[ERROR] Cannot connect as a broker to the locator, maybe the " +
+                                "maximum number of allowed brokers is already reached.");
+                        System.exit(0);
                     }
                 }
                 case NET_DISCOVERY_RESPONSE -> {

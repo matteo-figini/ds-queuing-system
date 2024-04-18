@@ -52,8 +52,6 @@ public class NodeHandler implements Runnable {
     @Override
     public void run() {
         System.out.println("[INFO] Established connection with " + clientSocket.getInetAddress());
-
-
         while (!Thread.currentThread().isInterrupted()) {
             synchronized (inputLockObject) {
                 Message message = null;
@@ -69,23 +67,13 @@ public class NodeHandler implements Runnable {
                     }
                     Thread.currentThread().interrupt();
                 }
-
                 // If the message is valid, handle it.
                 if (message != null) {
-                    if (message.type == MessageType.HELLO_REQUEST) {
-                        locatorNetwork.onHelloRequestMessageReceived((HelloRequestMessage) message, this);
-                    } else {
-                        locatorNetwork.onMessageReceived(message, this);
-                    }
+                    locatorNetwork.onMessageReceived(message, this);
                 }
             }
         }
-        // TODO: handle the client disconnection from the locator side
-        try {
-            clientSocket.close();
-        } catch (IOException e) {
-            System.out.println("[EXCEPTION] Unable to close the socket: " + e.getMessage());
-        }
+        disconnect();
     }
 
     /**
@@ -101,13 +89,26 @@ public class NodeHandler implements Runnable {
                 System.out.println("[INFO] Message sent.");
             }
         } catch (IOException e) {
-            e.printStackTrace();
             System.out.println("[EXCEPTION] Unable to send message: " + e.getMessage());
-            // TODO: disconnect the node
+            disconnect();
         }
     }
 
-    public Socket getClientSocket() {
-        return clientSocket;
+    /**
+     * Disconnect the current {@code NodeHandler} from the connected node, close the socket and leave the control
+     * to the {@code LocatorNetwork}.
+     */
+    public void disconnect () {
+        try {
+            if (!clientSocket.isClosed()) {
+                clientSocket.close();
+            }
+        } catch (IOException e) {
+            System.out.println("[EXCEPTION] Unable to close the socket: " + e.getMessage());
+        }
+        if (!Thread.currentThread().isInterrupted()) {
+            Thread.currentThread().interrupt();
+        }
+        locatorNetwork.onClientDisconnection(this);
     }
 }

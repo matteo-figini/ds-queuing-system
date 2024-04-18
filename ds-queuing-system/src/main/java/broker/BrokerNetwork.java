@@ -30,6 +30,12 @@ public class BrokerNetwork {
     // Reference to the broker's controller.
     private final BrokerController brokerController;
 
+    /**
+     * Create the {@code BrokerNetwork}.
+     * @param controller {@code BrokerController} of the broker - must be already instantiated.
+     * @param locatorIPAddress IP address of the remote locator.
+     * @param locatorPort Port, on which the locator is listening for new connections.
+     */
     public BrokerNetwork(BrokerController controller, String locatorIPAddress, int locatorPort) {
         this.brokerController = controller;
         try {
@@ -53,7 +59,8 @@ public class BrokerNetwork {
             this.locatorSocketOS.writeObject(message);
             this.locatorSocketOS.reset();
         } catch (IOException e) {
-            e.printStackTrace(); // TODO: to be replaced with the effective disconnection.
+            disconnectFromLocator();
+            System.out.println("[EXCEPTION] Cannot send the message to the locator. Disconnected.");
         }
     }
 
@@ -67,13 +74,27 @@ public class BrokerNetwork {
                 try {
                     message = (Message) locatorSocketIS.readObject();
                 } catch (IOException | ClassNotFoundException e) {
-                    // TODO: handle disconnection from the locator
+                    disconnectFromLocator();
                     message = null;
                     readFromLocatorService.shutdownNow();
                 }
                 brokerController.update(message);
             }
         });
+    }
+
+    /**
+     * Disconnect the broker from the locator, closing the connection and stops listening for new messages.
+     */
+    public void disconnectFromLocator () {
+        try {
+            if (!socketToLocator.isClosed()) {
+                socketToLocator.close();
+            }
+        } catch (IOException e) {
+            System.out.println("[EXCEPTION] Unable to close the connection to the locator properly.");
+            e.printStackTrace();
+        }
     }
 
     /**
