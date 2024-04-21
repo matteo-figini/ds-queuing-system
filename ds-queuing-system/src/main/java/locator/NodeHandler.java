@@ -22,8 +22,8 @@ public class NodeHandler implements Runnable {
     private final LocatorNetwork locatorNetwork;
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
-    private final Object inputLockObject;
-    private final Object outputLockObject;
+    private final Object inputLockObject = new Object();
+    private final Object outputLockObject = new Object();
 
     /**
      * This constructor creates a socket NodeHandler which will manage by thread every single client connection.
@@ -33,8 +33,6 @@ public class NodeHandler implements Runnable {
     public NodeHandler(LocatorNetwork locatorNetwork, Socket clientSocket) {
         this.clientSocket = clientSocket;
         this.locatorNetwork = locatorNetwork;
-        this.inputLockObject = new Object();
-        this.outputLockObject = new Object();
 
         try {
             this.outputStream = new ObjectOutputStream(this.clientSocket.getOutputStream());

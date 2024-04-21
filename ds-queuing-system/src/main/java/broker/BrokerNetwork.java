@@ -1,5 +1,6 @@
 package broker;
 
+import locator.NodeReference;
 import messages.Message;
 
 import java.io.IOException;
@@ -7,6 +8,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,8 +27,11 @@ public class BrokerNetwork {
     private ObjectOutputStream locatorSocketOS;
     private final ExecutorService readFromLocatorService = Executors.newSingleThreadExecutor();
 
-    // Other connections
+    // Other connections on which the broker acts as a server
     private BrokerServerSocket brokerServerSocket;
+
+    // Other connections on which the broker acts as a client
+    private final HashMap<String, OtherBrokerSocket> otherBrokerSocketHashMap = new HashMap<>();
 
     // Reference to the broker's controller.
     private final BrokerController brokerController;
@@ -114,5 +120,30 @@ public class BrokerNetwork {
      */
     public int getBrokerPublicPort () {
         return brokerServerSocket.getPublicPort();
+    }
+
+    public void onMessageReceived (Message message) {
+        // TODO: to be managed
+    }
+
+    public void onBrokerDisconnection(OtherNodeClientHandler otherBrokerClientHandler) {
+        // TODO: to be managed
+    }
+
+    /**
+     *
+     * @param nodeReference
+     * @return
+     */
+    public boolean connectToOtherBroker (NodeReference nodeReference) {
+        try {
+            OtherBrokerSocket otherBrokerSocket = new OtherBrokerSocket(nodeReference.getIpAddress(),
+                    nodeReference.getPublicPort(), this);
+            otherBrokerSocketHashMap.put(nodeReference.getNodeName(), otherBrokerSocket);
+            System.out.println("[INFO] Successfully connected to other broker: " + nodeReference);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 }

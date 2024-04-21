@@ -1,0 +1,29 @@
+All'inizio della seconda parte dell'inizializzazione del Broker, lo scenario in corretto funzionamento è questo:
+- Il broker ha già aperto la sua ServerSocket su cui accettare nuove connessioni
+    - da altri broker che si connetteranno poi al locator,
+    - da eventuali client esterni;
+- Il broker ha ricevuto dal locator la lista di tutti gli altri broker già connessi alla rete.
+
+BrokerController tiene un riferimento a tutti gli altri nodi connessi, identificati tramite il loro nome (assumendo che
+tutti i nodi nella rete abbiano un nome univoco). Per ogni nodo connesso il broker memorizza:
+- Il nome del nodo
+- Il suo ruolo (se è un altro broker oppure un client)
+- Indirizzo IP e porta pubblica
+Nei confronti di un client il broker si comporta sempre come un server, invece nei confronti degli altri broker
+il broker può comportarsi sia come client, sia come server:
+- Il broker è disponibile ad accettare connessioni da altri broker che si collegheranno successivamente alla rete
+  e nei confronti di tali broker si comporta da server:
+   1. BrokerServerSocket si occupa di ascoltare per nuove connessioni sulla propria porta pubblica
+   2. Quando un nuovo nodo tenta di connettersi, la connessione verrà gestita da OtherNodeClientHandler: la procedura
+      di "handshaking" si occupa di stabilire se il nodo connesso è un altro broker oppure un client
+- Il broker si connette ai broker già connessi alla rete precedentemente e nei confronti di tali broker si comporta da
+  client.
+
+
+NOTE SULLA PROCEDURA DI HANDSHAKING:
+Nella procedura di inizializzazione il momento di svolta è quello in cui tutti i broker previsti si sono connessi al
+locator (che per brevità chiameremo turning point):
+- Prima del turning point solo i broker sono autorizzati a connettersi al locator oppure ad un altro broker; nessun
+  client può connettersi ad un broker.
+- Dopo il turning point, un broker è autorizzato a connettersi alla rete solo a seguito di una disconnessione.
+

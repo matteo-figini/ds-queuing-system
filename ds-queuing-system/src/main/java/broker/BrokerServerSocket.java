@@ -7,7 +7,7 @@ import java.net.Socket;
 
 /**
  * This class represents the broker's server socket that is actively listening for new connection
- * from other brokers. The behaviour is the same as a generic {@code ServerSocket} for a server.
+ * from other brokers. The behaviour is similar to a generic {@code ServerSocket} for a server.
  */
 public class BrokerServerSocket implements Runnable {
     private ServerSocket brokerServerSocket;
@@ -38,7 +38,9 @@ public class BrokerServerSocket implements Runnable {
                 Socket clientSocket = brokerServerSocket.accept();
                 System.out.println("[INFO] New connection request from: " + clientSocket.getInetAddress() +
                         " on port " + clientSocket.getPort());
-                // TODO: create and start the handler of the other brokers.
+                OtherNodeClientHandler nodeClientHandler = new OtherNodeClientHandler(brokerNetworkRef, clientSocket);
+                Thread thread = new Thread(nodeClientHandler);
+                thread.start();
             } catch (IOException e) {
                 System.out.println("[EXCEPTION] " + e.getMessage());
             }

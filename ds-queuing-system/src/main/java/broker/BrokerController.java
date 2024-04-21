@@ -1,5 +1,6 @@
 package broker;
 
+import locator.NodeReference;
 import messages.Message;
 import messages.network.HelloRequestMessage;
 import messages.network.HelloResponseMessage;
@@ -8,6 +9,7 @@ import messages.network.NetDiscoveryResponseMessage;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 
 /**
  * This class represents the main element of a broker, managing all the underlying logic
@@ -16,6 +18,10 @@ import java.net.UnknownHostException;
 public class BrokerController {
     private final String brokerName;
     private BrokerNetwork brokerNetwork;
+
+    // This structure keeps a reference to every other node (broker or client) connected to the broker, identified
+    // by their name.
+    private final HashMap<String, NodeReference> nodesConnected = new HashMap<>();
 
     /**
      * Create the {@code BrokerController} instance.
@@ -71,8 +77,21 @@ public class BrokerController {
                 }
                 case NET_DISCOVERY_RESPONSE -> {
                     NetDiscoveryResponseMessage netDiscoveryResponseMessage = (NetDiscoveryResponseMessage) message;
-                    System.out.println(netDiscoveryResponseMessage);
+                    for (NodeReference nodeReference : netDiscoveryResponseMessage.getBrokersConnected()) {
+                        if (!nodeReference.getNodeName().equals(brokerName)) {
+                            nodesConnected.put(nodeReference.getNodeName(), nodeReference);
+                        }
+                    }
+                    connectToOtherBrokers ();
                 }
+            }
+        }
+    }
+
+    private void connectToOtherBrokers() {
+        for (NodeReference nodeReference : nodesConnected.values()) {
+            if (nodeReference.isBroker()) {
+                brokerNetwork.connectToOtherBroker(nodeReference);
             }
         }
     }
