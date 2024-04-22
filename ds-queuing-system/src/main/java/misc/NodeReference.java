@@ -1,4 +1,4 @@
-package locator;
+package misc;
 
 import java.io.Serializable;
 

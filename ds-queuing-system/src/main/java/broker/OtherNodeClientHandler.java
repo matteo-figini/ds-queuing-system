@@ -57,7 +57,7 @@ public class OtherNodeClientHandler implements Runnable {
                     Thread.currentThread().interrupt();
                 }
                 if (message != null) {
-                    brokerNetworkRef.onMessageReceived(message);
+                    brokerNetworkRef.onMessageReceived(message, this);
                 }
             }
         }

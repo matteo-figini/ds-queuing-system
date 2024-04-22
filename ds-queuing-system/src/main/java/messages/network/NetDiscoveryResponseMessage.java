@@ -1,6 +1,6 @@
 package messages.network;
 
-import locator.NodeReference;
+import misc.NodeReference;
 import messages.Message;
 import messages.MessageType;
 

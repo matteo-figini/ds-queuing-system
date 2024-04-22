@@ -1,6 +1,6 @@
 package broker;
 
-import locator.NodeReference;
+import misc.NodeReference;
 import messages.Message;
 
 import java.io.IOException;
@@ -9,7 +9,6 @@ import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,6 +28,7 @@ public class BrokerNetwork {
 
     // Other connections on which the broker acts as a server
     private BrokerServerSocket brokerServerSocket;
+    private final HashMap<String, OtherNodeClientHandler> otherNodeClientHandlers = new HashMap<>();
 
     // Other connections on which the broker acts as a client
     private final HashMap<String, OtherBrokerSocket> otherBrokerSocketHashMap = new HashMap<>();
@@ -122,8 +122,8 @@ public class BrokerNetwork {
         return brokerServerSocket.getPublicPort();
     }
 
-    public void onMessageReceived (Message message) {
-        // TODO: to be managed
+    public void onMessageReceived (Message message, OtherNodeClientHandler otherNodeClientHandler) {
+        brokerController.update(message);
     }
 
     public void onBrokerDisconnection(OtherNodeClientHandler otherBrokerClientHandler) {
@@ -131,7 +131,7 @@ public class BrokerNetwork {
     }
 
     /**
-     *
+     * Connects to the other broker
      * @param nodeReference
      * @return
      */
@@ -145,5 +145,22 @@ public class BrokerNetwork {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    public boolean sendMessageToBroker (String receiverBroker, Message message) {
+        boolean messageSent = false;
+        if (receiverBroker.equals("all")) {
+            // Used to send a message to all the brokers
+
+        } else {
+            if (otherBrokerSocketHashMap.containsKey(receiverBroker)) {
+                // The current broker acts as a "client" w.r.t. the other broker
+                OtherBrokerSocket otherBrokerSocket = otherBrokerSocketHashMap.get(receiverBroker);
+                otherBrokerSocket.sendMessage(message);
+            } else {
+                System.out.println("[ERROR] Cannot send the message; broker " + receiverBroker + " not found!");
+            }
+        }
+        return messageSent;
     }
 }

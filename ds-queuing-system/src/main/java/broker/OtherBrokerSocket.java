@@ -1,5 +1,7 @@
 package broker;
 
+import messages.Message;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -32,6 +34,16 @@ public class OtherBrokerSocket {
         this.otherBrokerOS = new ObjectOutputStream(socket.getOutputStream());
     }
 
-
-
+    /**
+     * // TODO: doc
+     * @param message
+     */
+    public void sendMessage(Message message) {
+        try {
+            this.otherBrokerOS.writeObject(message);
+            this.otherBrokerOS.reset();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

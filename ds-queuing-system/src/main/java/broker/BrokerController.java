@@ -1,6 +1,6 @@
 package broker;
 
-import locator.NodeReference;
+import misc.NodeReference;
 import messages.Message;
 import messages.network.HelloRequestMessage;
 import messages.network.HelloResponseMessage;
@@ -75,6 +75,16 @@ public class BrokerController {
                         System.exit(0);
                     }
                 }
+                case HELLO_REQUEST -> {
+                    // Message sent from another "client" broker
+                    HelloRequestMessage helloRequestMessage = (HelloRequestMessage) message;
+                    NodeReference nodeReference = new NodeReference(helloRequestMessage.getNodeIPAddress(),
+                            helloRequestMessage.getNodePublicPort(),
+                            helloRequestMessage.getNodeName(),
+                            helloRequestMessage.isBroker());
+                    nodesConnected.put(helloRequestMessage.getNodeName(), nodeReference);
+                    System.out.println("[INFO] New node connected: " + nodeReference);
+                }
                 case NET_DISCOVERY_RESPONSE -> {
                     NetDiscoveryResponseMessage netDiscoveryResponseMessage = (NetDiscoveryResponseMessage) message;
                     for (NodeReference nodeReference : netDiscoveryResponseMessage.getBrokersConnected()) {
@@ -82,7 +92,9 @@ public class BrokerController {
                             nodesConnected.put(nodeReference.getNodeName(), nodeReference);
                         }
                     }
-                    connectToOtherBrokers ();
+                    connectToOtherBrokers();
+                    System.out.println("[INFO] Connected to " + nodesConnected.size() + " brokers.");
+                    System.out.println(nodesConnected);
                 }
             }
         }
@@ -92,6 +104,16 @@ public class BrokerController {
         for (NodeReference nodeReference : nodesConnected.values()) {
             if (nodeReference.isBroker()) {
                 brokerNetwork.connectToOtherBroker(nodeReference);
+                try {
+                    brokerNetwork.sendMessageToBroker(nodeReference.getNodeName(), new HelloRequestMessage (
+                            Inet4Address.getLocalHost().getHostAddress(),
+                            brokerNetwork.getBrokerPublicPort(),
+                            brokerName,
+                            true
+                    ));
+                } catch (UnknownHostException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
     }

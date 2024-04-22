@@ -5,6 +5,7 @@ import messages.MessageType;
 import messages.network.HelloRequestMessage;
 import messages.network.HelloResponseMessage;
 import messages.network.NetDiscoveryResponseMessage;
+import misc.NodeReference;
 
 import java.util.ArrayList;
 import java.util.HashMap;
