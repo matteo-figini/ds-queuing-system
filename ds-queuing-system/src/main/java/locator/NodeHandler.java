@@ -17,6 +17,8 @@ import java.net.Socket;
  * locator.
  */
 public class NodeHandler implements Runnable {
+    // Application attributes
+    private String nodeName;
     // Network attributes
     private final Socket clientSocket;
     private final LocatorNetwork locatorNetwork;
@@ -49,7 +51,7 @@ public class NodeHandler implements Runnable {
      */
     @Override
     public void run() {
-        System.out.println("[INFO] Established connection with " + clientSocket.getInetAddress());
+        System.out.println("[INFO] Established connection with " + clientSocket.getInetAddress() + ":" + clientSocket.getPort());
         while (!Thread.currentThread().isInterrupted()) {
             synchronized (inputLockObject) {
                 Message message = null;
@@ -108,5 +110,20 @@ public class NodeHandler implements Runnable {
             Thread.currentThread().interrupt();
         }
         locatorNetwork.onClientDisconnection(this);
+    }
+
+    /**
+     * @return The name of the node connected to the locator via this {@code NodeHandler}.
+     */
+    public String getNodeName() {
+        return nodeName;
+    }
+
+    /**
+     * Set the name of the node connected to the locator via this {@code NodeHandler}.
+     * @param nodeName Name of the connected node.
+     */
+    public void setNodeName(String nodeName) {
+        this.nodeName = nodeName;
     }
 }

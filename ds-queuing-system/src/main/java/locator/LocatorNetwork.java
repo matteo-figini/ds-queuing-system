@@ -11,18 +11,12 @@ import java.net.Socket;
 
 /**
  * This class handles all the network communication by the locator component.
- * The communication between the locator and the brokers is mediated via TCP protocol,
- * ensuring persistent connection.
+ * The communication between the locator and the brokers is mediated via TCP protocol, ensuring persistent connection.
  */
 public class LocatorNetwork implements Runnable {
-    /** Port on which the locator has the {@code ServerSocket} open. */
     private final int port;
-
-    /** {@code ServerSocket} on which the locator is listening for new incoming connections. */
-    private ServerSocket serverSocket;
-
-    /** Reference to the {@code LocatorController}. */
     private final LocatorController locatorController;
+    private ServerSocket serverSocket;
 
     /**
      * Set the default parameters needed for running the locator.
@@ -42,21 +36,19 @@ public class LocatorNetwork implements Runnable {
     public void run() {
         try {
             this.serverSocket = new ServerSocket(this.port);
-            System.out.println("[INFO] Locator's network running on " + Inet4Address.getLocalHost().getHostAddress() +
+            System.out.println("[INFO] Locator's network listening on " + Inet4Address.getLocalHost().getHostAddress() +
                     ":" + this.port + " via TCP socket connection.");
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to start the locator's server socket.");
             System.out.println(e.getMessage());
+            System.exit(1);
         }
 
         // Keeps listening on the ServerSocket.
-        // Every time a new node connects to the ServerSocket,
-        // instantiate and run the corresponding NodeHandler.
+        // Every time a new node connects to the ServerSocket, instantiate and run the corresponding NodeHandler.
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("[INFO] New connection request from: " + clientSocket.getInetAddress() +
-                        " on port " + clientSocket.getPort());
                 NodeHandler nodeHandler = new NodeHandler(this, clientSocket);
                 Thread thread = new Thread(nodeHandler);
                 thread.start();
@@ -80,8 +72,11 @@ public class LocatorNetwork implements Runnable {
         }
     }
 
-
+    /**
+     * Call the disconnection procedure on the {@code LocatorController}.
+     * @param nodeHandler The {@code NodeHandler} to be disconnected.
+     */
     public void onClientDisconnection(NodeHandler nodeHandler) {
-
+        locatorController.disconnectNode(nodeHandler);
     }
 }

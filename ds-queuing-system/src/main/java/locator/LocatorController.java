@@ -7,30 +7,24 @@ import messages.network.HelloResponseMessage;
 import messages.network.NetDiscoveryResponseMessage;
 import misc.NodeReference;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * This class represents the controller of the locator. It stores information useful for the network, such as
- * the brokers and the clients connected to the network, the maximum number of brokers allowed in the network
- * and so on.
+ * This class represents the controller of the locator. It stores the set of brokers and clients
+ * connected to the network and the maximum number of brokers allowed in the network.
  */
 public class LocatorController {
     private LocatorNetwork locatorNetworkRef;
-    private final Map<String, NodeHandler> nodeHandlers;
-    private final List<NodeReference> nodesConnected;
+    private final Map<String, NodeHandler> nodeHandlers = new HashMap<>();
+    private final List<NodeReference> nodesConnected = new ArrayList<>();
     private int brokersConnected = 0;
     private final int maximumBrokerNumber;
 
     /**
-     * Create the {@code LocatorController}.
+     * Create the {@code LocatorController} and set the maximum number of brokers allowed.
      * @param brokers The maximum number of brokers connected to the network.
      */
     public LocatorController (int brokers) {
-        nodeHandlers = new HashMap<>();
-        nodesConnected = new ArrayList<>();
         this.maximumBrokerNumber = brokers;
     }
 
@@ -44,12 +38,15 @@ public class LocatorController {
 
     /**
      * Handles the receiving of a message.
+     * If the message type is not supported, an error message is printed on the standard output.
      * @param message The message received.
      */
     public void onMessageReceived (Message message, NodeHandler senderReference) {
-        if (message.type == MessageType.NET_DISCOVERY_REQUEST) {
+        if (Objects.requireNonNull(message.type) == MessageType.NET_DISCOVERY_REQUEST) {
             List<NodeReference> brokersConnected = getConnectedBrokers();
             senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected));
+        } else {
+            System.out.println("[ERROR] Message type " + message.type + " not supported.");
         }
     }
 
@@ -63,12 +60,13 @@ public class LocatorController {
      * @param nodeHandler The {@code NodeHandler} representing the reference to the connected node.
      */
     public void addNode (HelloRequestMessage message, NodeHandler nodeHandler) {
+        nodeHandler.setNodeName(message.getNodeName());
         if (message.isBroker() && brokersConnected >= maximumBrokerNumber) {
             System.out.println("[ERROR] Number of maximum brokers already reached: unable to connect " + message.getNodeName());
             nodeHandler.sendMessage(new HelloResponseMessage(false));
-            // TODO: call a disconnection method on {@code NodeHandler}.
         } else {
             // When a node connects to the locator:
+            // - Set the name of the connected node
             // - Add the corresponding NodeHandler to the map associating the name to the NodeHandler;
             // - Create a NodeReference and add it to the list.
             nodeHandlers.put(message.getNodeName(), nodeHandler);
@@ -80,17 +78,16 @@ public class LocatorController {
                     message.getNodeName(),
                     message.isBroker());
             nodesConnected.add(nodeReference);
-            System.out.println("[INFO] Added new node: " + nodeReference);
+            System.out.println(message.isBroker() ?
+                    "[INFO] Added new broker: " + nodeReference :
+                    "[INFO] Added new client: " + nodeReference);
             nodeHandler.sendMessage(new HelloResponseMessage(true));
         }
     }
 
-    /* ---------- GETTERS ---------- */
-
-
     /* ---------- UTILITY METHODS ---------- */
     /**
-     * @return The list of all the brokers actually connected to the locator.
+     * @return The list of all the nodes, that are also brokers, actually connected to the locator.
      */
     private List<NodeReference> getConnectedBrokers () {
         List<NodeReference> brokersConnected = new ArrayList<>();
@@ -100,5 +97,23 @@ public class LocatorController {
             }
         }
         return brokersConnected;
+    }
+
+    /**
+     * Remove all the references of the {@code NodeHandler} passed as parameter.
+     * If the {@code NodeHandler} has the parameter "nodeName" already set, remove it also from the list of
+     * {@code NodeReference} stored by the {@code LocatorController}.
+     * @param nodeHandler The node to be removed from the locator. The NodeHandler must have the attribute "nodeName"
+     *                    must be properly set, otherwise a {@code NullPointerException} will be raised.
+     */
+    public void disconnectNode (NodeHandler nodeHandler) {
+        try {
+            nodesConnected.removeIf(nodeReference -> nodeReference.getNodeName().equals(nodeHandler.getNodeName()));
+            nodeHandlers.remove(nodeHandler.getNodeName());
+            System.out.println("[INFO] Removed NodeHandler of node " + nodeHandler.getNodeName() + " from the locator.");
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+            System.out.println("[ERROR] Node handler name " + nodeHandler + " not found.");
+        }
     }
 }

@@ -137,7 +137,9 @@ public class BrokerNetwork {
      */
     public boolean connectToOtherBroker (NodeReference nodeReference) {
         try {
-            OtherBrokerSocket otherBrokerSocket = new OtherBrokerSocket(nodeReference.getIpAddress(),
+            OtherBrokerSocket otherBrokerSocket = new OtherBrokerSocket(
+                    nodeReference.getNodeName(),
+                    nodeReference.getIpAddress(),
                     nodeReference.getPublicPort(), this);
             otherBrokerSocketHashMap.put(nodeReference.getNodeName(), otherBrokerSocket);
             System.out.println("[INFO] Successfully connected to other broker: " + nodeReference);
