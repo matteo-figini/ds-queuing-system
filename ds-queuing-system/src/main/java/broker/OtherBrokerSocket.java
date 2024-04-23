@@ -40,30 +40,21 @@ public class OtherBrokerSocket {
 
     /**
      * // TODO: doc
-     * @param message
+     * @param message Message to be sent on the receiver.
      */
     public void sendMessage(Message message) {
         try {
             this.otherBrokerOS.writeObject(message);
             this.otherBrokerOS.reset();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("[EXCEPTION] " + e.getMessage());
         }
     }
 
-    public void readMessageFromOtherBroker() {
-        readFromBrokerService.execute(() -> {
-            while (!readFromBrokerService.isShutdown()) {
-                Message message;
-                try {
-                    message = (Message) otherBrokerIS.readObject();
-                } catch (IOException | ClassNotFoundException e) {
-                    // disconnectFromLocator();
-                    message = null;
-                    readFromBrokerService.shutdownNow();
-                }
-                // Handle message
-            }
-        });
+    /**
+     * @return The name of the connected node on which {@code OtherBrokerSocket} refers to.
+     */
+    public String getOtherBrokerName() {
+        return otherBrokerName;
     }
 }

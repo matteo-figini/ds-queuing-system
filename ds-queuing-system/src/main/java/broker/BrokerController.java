@@ -60,9 +60,10 @@ public class BrokerController {
 
     /**
      * Receives a message from the {@code BrokerNetwork} and process it, based on the message type.
+     * If the message type is not supported, an error message will be printed on the screen.
      * @param message The message received.
      */
-    public void update (Message message) {
+    public void update (Message message, String sender) {
         if (message != null) {
             switch (message.type) {
                 case HELLO_RESPONSE -> {
@@ -75,16 +76,6 @@ public class BrokerController {
                         System.exit(0);
                     }
                 }
-                case HELLO_REQUEST -> {
-                    // Message sent from another "client" broker
-                    HelloRequestMessage helloRequestMessage = (HelloRequestMessage) message;
-                    NodeReference nodeReference = new NodeReference(helloRequestMessage.getNodeIPAddress(),
-                            helloRequestMessage.getNodePublicPort(),
-                            helloRequestMessage.getNodeName(),
-                            helloRequestMessage.isBroker());
-                    nodesConnected.put(helloRequestMessage.getNodeName(), nodeReference);
-                    System.out.println("[INFO] New node connected: " + nodeReference);
-                }
                 case NET_DISCOVERY_RESPONSE -> {
                     NetDiscoveryResponseMessage netDiscoveryResponseMessage = (NetDiscoveryResponseMessage) message;
                     for (NodeReference nodeReference : netDiscoveryResponseMessage.getBrokersConnected()) {
@@ -96,8 +87,23 @@ public class BrokerController {
                     System.out.println("[INFO] Connected to " + nodesConnected.size() + " brokers.");
                     System.out.println(nodesConnected);
                 }
+                case BROKERS_READY_MESSAGE -> {
+                    System.out.println("[INFO] Network ready to start: " + nodesConnected);
+                }
+                default -> System.out.println("[ERROR] Unknown message type " + message.type);
             }
         }
+    }
+
+    /**
+     * Add the reference of the {@code NodeReference} passed as parameter to the map associating each string (the name
+     * of the node) to the corresponding {@code NodeReference} and print a message.
+     * @param nodeReference Representation of the new connected node.
+     */
+    public void addNode (NodeReference nodeReference) {
+        nodesConnected.put(nodeReference.getNodeName(), nodeReference);
+        System.out.println("[INFO] New node connected: " + nodeReference);
+        System.out.println(nodesConnected);
     }
 
     private void connectToOtherBrokers() {

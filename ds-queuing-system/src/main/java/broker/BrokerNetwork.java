@@ -1,5 +1,7 @@
 package broker;
 
+import messages.MessageType;
+import messages.network.HelloRequestMessage;
 import misc.NodeReference;
 import messages.Message;
 
@@ -84,7 +86,7 @@ public class BrokerNetwork {
                     message = null;
                     readFromLocatorService.shutdownNow();
                 }
-                brokerController.update(message);
+                brokerController.update(message, "locator");
             }
         });
     }
@@ -122,8 +124,13 @@ public class BrokerNetwork {
         return brokerServerSocket.getPublicPort();
     }
 
-    public void onMessageReceived (Message message, OtherNodeClientHandler otherNodeClientHandler) {
-        brokerController.update(message);
+    /**
+     * Pass a message received from another connected node to the {@code BrokerController}.
+     * @param message The message received from one of the open connections.
+     * @param sender The name of the sender of the message.
+     */
+    public void onMessageReceived (Message message, String sender) {
+        brokerController.update(message, sender);
     }
 
     public void onBrokerDisconnection(OtherNodeClientHandler otherBrokerClientHandler) {
@@ -149,7 +156,7 @@ public class BrokerNetwork {
         }
     }
 
-    public boolean sendMessageToBroker (String receiverBroker, Message message) {
+    public void sendMessageToBroker (String receiverBroker, Message message) {
         boolean messageSent = false;
         if (receiverBroker.equals("all")) {
             // Used to send a message to all the brokers
@@ -163,6 +170,14 @@ public class BrokerNetwork {
                 System.out.println("[ERROR] Cannot send the message; broker " + receiverBroker + " not found!");
             }
         }
-        return messageSent;
+    }
+
+    public void addNode(HelloRequestMessage message, OtherNodeClientHandler otherNodeClientHandler) {
+        otherNodeClientHandlers.put(message.getNodeName(), otherNodeClientHandler);
+        NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(),
+                message.getNodePublicPort(),
+                message.getNodeName(),
+                message.isBroker());
+        brokerController.addNode(nodeReference);
     }
 }

@@ -31,8 +31,7 @@ public class BrokerServerSocket implements Runnable {
         }
 
         // Keeps listening on the ServerSocket.
-        // Every time a new node connects to the ServerSocket,
-        // instantiate and run the corresponding NodeHandler.
+        // Every time a new node connects to the ServerSocket, instantiate and run the corresponding NodeHandler.
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 Socket clientSocket = brokerServerSocket.accept();

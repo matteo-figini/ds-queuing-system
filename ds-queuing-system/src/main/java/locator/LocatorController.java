@@ -2,6 +2,7 @@ package locator;
 
 import messages.Message;
 import messages.MessageType;
+import messages.network.BrokersReadyMessage;
 import messages.network.HelloRequestMessage;
 import messages.network.HelloResponseMessage;
 import messages.network.NetDiscoveryResponseMessage;
@@ -82,6 +83,19 @@ public class LocatorController {
                     "[INFO] Added new broker: " + nodeReference :
                     "[INFO] Added new client: " + nodeReference);
             nodeHandler.sendMessage(new HelloResponseMessage(true));
+
+            /*System.out.println("[DEBUG] Number of connected brokers: " + brokersConnected);
+            if (brokersConnected == maximumBrokerNumber) {
+                // Send a message to all the brokers confirming that network is set up.
+                for (NodeReference nodeRef : nodesConnected) {
+                    if (nodeRef.isBroker()) {
+                        NodeHandler handler = nodeHandlers.get(nodeRef.getNodeName());
+                        if (handler != null) {
+                            handler.sendMessage(new BrokersReadyMessage());
+                        }
+                    }
+                }
+            }*/
         }
     }
 
@@ -107,13 +121,13 @@ public class LocatorController {
      *                    must be properly set, otherwise a {@code NullPointerException} will be raised.
      */
     public void disconnectNode (NodeHandler nodeHandler) {
+        // TODO: if the node disconnected is a broker, reduce the number of brokers connected.
         try {
             nodesConnected.removeIf(nodeReference -> nodeReference.getNodeName().equals(nodeHandler.getNodeName()));
             nodeHandlers.remove(nodeHandler.getNodeName());
             System.out.println("[INFO] Removed NodeHandler of node " + nodeHandler.getNodeName() + " from the locator.");
         } catch (NullPointerException e) {
-            e.printStackTrace();
-            System.out.println("[ERROR] Node handler name " + nodeHandler + " not found.");
+            System.out.println("[EXCEPTION] Node handler name " + nodeHandler + " not found.");
         }
     }
 }

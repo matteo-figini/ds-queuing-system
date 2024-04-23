@@ -1,6 +1,8 @@
 package broker;
 
 import messages.Message;
+import messages.MessageType;
+import messages.network.HelloRequestMessage;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -9,16 +11,19 @@ import java.net.Socket;
 
 /**
  * This class represents the connection from a broker A to another broker B on which the broker A acts as a server
- * and the broker B acts as a client, seen from the point of view of the broker A. The behaviour is similar to a
+ * and the broker B acts as a client, seen from the point of view of the broker A. The behavior is similar to a
  * generic client handler from the server side.
  */
 public class OtherNodeClientHandler implements Runnable {
+    // Application attributes
+    private String otherNodeName;
+    private final BrokerNetwork brokerNetworkRef;
+    // Network attributes
     private final Socket brokerSocket;
     private ObjectInputStream brokerSocketIS;
     private ObjectOutputStream brokerSocketOS;
     private final Object inputLockObject = new Object();
     private final Object outputLockObject = new Object();
-    private final BrokerNetwork brokerNetworkRef;
 
     /**
      * Create the {@code OtherNodeClientHandler} and open the corresponding streams.
@@ -34,7 +39,7 @@ public class OtherNodeClientHandler implements Runnable {
             this.brokerSocketOS = new ObjectOutputStream(brokerSocket.getOutputStream());
             this.brokerSocketIS = new ObjectInputStream(brokerSocket.getInputStream());
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("[EXCEPTION] " + e.getMessage());
         }
     }
 
@@ -57,7 +62,14 @@ public class OtherNodeClientHandler implements Runnable {
                     Thread.currentThread().interrupt();
                 }
                 if (message != null) {
-                    brokerNetworkRef.onMessageReceived(message, this);
+                    if (message.type == MessageType.HELLO_REQUEST) {
+                        // Message received from another broker to establish a connection.
+                        HelloRequestMessage helloRequestMessage = (HelloRequestMessage) message;
+                        addNode(helloRequestMessage);
+                    } else {
+                        // Normal message to be handled.
+                        brokerNetworkRef.onMessageReceived(message, otherNodeName);
+                    }
                 }
             }
         }
@@ -97,5 +109,22 @@ public class OtherNodeClientHandler implements Runnable {
             Thread.currentThread().interrupt();
         }
         brokerNetworkRef.onBrokerDisconnection(this);
+    }
+
+    /**
+     * Set the name of the node and pass the control to {@code BrokerNetwork} to properly handle the addition of a new
+     * connected node.
+     * @param message "Hello" message received from the other node.
+     */
+    public void addNode (HelloRequestMessage message) {
+        this.otherNodeName = message.getNodeName();
+        brokerNetworkRef.addNode(message, this);
+    }
+
+    /**
+     * @return The name of the other node connected via this {@code OtherNodeClientHandler}.
+     */
+    public String getOtherNodeName() {
+        return otherNodeName;
     }
 }
