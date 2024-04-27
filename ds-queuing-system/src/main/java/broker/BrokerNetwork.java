@@ -1,19 +1,12 @@
 package broker;
 
-import messages.MessageType;
 import messages.network.HelloRequestMessage;
 import misc.NodeReference;
 import messages.Message;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.util.HashMap;
 import java.util.Scanner;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * This class handles the aspects related to the network interface of a single broker.
@@ -23,10 +16,7 @@ import java.util.concurrent.Executors;
  */
 public class BrokerNetwork {
     // Locator's connection
-    private Socket socketToLocator;
-    private ObjectInputStream locatorSocketIS;
-    private ObjectOutputStream locatorSocketOS;
-    private final ExecutorService readFromLocatorService = Executors.newSingleThreadExecutor();
+    private final LocatorSocket socketToLocator;
 
     // Other connections on which the broker acts as a server
     private BrokerServerSocket brokerServerSocket;
@@ -44,17 +34,10 @@ public class BrokerNetwork {
      * @param locatorIPAddress IP address of the remote locator.
      * @param locatorPort Port, on which the locator is listening for new connections.
      */
-    public BrokerNetwork(BrokerController controller, String locatorIPAddress, int locatorPort) {
+    public BrokerNetwork (BrokerController controller, String locatorIPAddress, int locatorPort) {
         this.brokerController = controller;
-        try {
-            socketToLocator = new Socket();
-            socketToLocator.connect(new InetSocketAddress(locatorIPAddress, locatorPort));
-            locatorSocketIS = new ObjectInputStream(socketToLocator.getInputStream());
-            locatorSocketOS = new ObjectOutputStream(socketToLocator.getOutputStream());
-            startBrokerServerSocket();
-        } catch (IOException e) {
-            System.out.println("[EXCEPTION] " + e.getMessage());
-        }
+        socketToLocator = new LocatorSocket(this, locatorIPAddress, locatorPort);
+        startBrokerServerSocket();
     }
 
     /**
@@ -63,46 +46,14 @@ public class BrokerNetwork {
      * @param message The message to be sent.
      */
     public void sendMessageToLocator (Message message) {
-        try {
-            this.locatorSocketOS.writeObject(message);
-            this.locatorSocketOS.reset();
-        } catch (IOException e) {
-            disconnectFromLocator();
-            System.out.println("[EXCEPTION] Cannot send the message to the locator. Disconnected.");
-        }
+        socketToLocator.sendMessage(message);
     }
 
     /**
      * Starts and execute the routine that keeps listening to new incoming messages from the locator.
      */
     public void readMessageFromLocator () {
-        readFromLocatorService.execute(() -> {
-            while (!readFromLocatorService.isShutdown()) {
-                Message message;
-                try {
-                    message = (Message) locatorSocketIS.readObject();
-                } catch (IOException | ClassNotFoundException e) {
-                    disconnectFromLocator();
-                    message = null;
-                    readFromLocatorService.shutdownNow();
-                }
-                brokerController.update(message, "locator");
-            }
-        });
-    }
-
-    /**
-     * Disconnect the broker from the locator, closing the connection and stops listening for new messages.
-     */
-    public void disconnectFromLocator () {
-        try {
-            if (!socketToLocator.isClosed()) {
-                socketToLocator.close();
-            }
-        } catch (IOException e) {
-            System.out.println("[EXCEPTION] Unable to close the connection to the locator properly.");
-            e.printStackTrace();
-        }
+        socketToLocator.readMessage();
     }
 
     /**

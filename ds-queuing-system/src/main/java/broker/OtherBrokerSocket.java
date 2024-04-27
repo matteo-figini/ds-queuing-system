@@ -36,11 +36,12 @@ public class OtherBrokerSocket {
         this.socket = new Socket(ipAddress, port);
         this.otherBrokerIS = new ObjectInputStream(socket.getInputStream());
         this.otherBrokerOS = new ObjectOutputStream(socket.getOutputStream());
+        this.readMessageFromOtherBroker();
     }
 
     /**
-     * // TODO: doc
-     * @param message Message to be sent on the receiver.
+     * Send the {@code Message} passed as a parameter to the other broker.
+     * @param message Message to be sent to the receiver.
      */
     public void sendMessage(Message message) {
         try {
@@ -49,6 +50,25 @@ public class OtherBrokerSocket {
         } catch (IOException e) {
             System.out.println("[EXCEPTION] " + e.getMessage());
         }
+    }
+
+    /**
+     * Starts and execute the routine that keeps listening on the {@code InputStream} from the other broker.
+     */
+    public void readMessageFromOtherBroker() {
+        readFromBrokerService.execute(() -> {
+            while (!readFromBrokerService.isShutdown()) {
+                Message message;
+                try {
+                    message = (Message) otherBrokerIS.readObject();
+                } catch (IOException | ClassNotFoundException e) {
+                    // disconnectFromLocator();
+                    message = null;
+                    readFromBrokerService.shutdownNow();
+                }
+                brokerNetworkRef.onMessageReceived(message, otherBrokerName);
+            }
+        });
     }
 
     /**
