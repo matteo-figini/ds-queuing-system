@@ -4,11 +4,16 @@ import messages.application.LogResponse;
 import messages.application.VoteRequest;
 import messages.application.VoteResponse;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * This class defines the logic of a Raft node.
+ * @param <T> The type of the LogItem that will be stored in the node's log.
+ */
 public class RaftNode<T> {
 
     /** Number of nodes in the raft network, decided at compile time */
@@ -51,6 +56,8 @@ public class RaftNode<T> {
      */
     private HashMap<Integer, Integer> ackedLength = new HashMap<>();
 
+    final private LogFilesHandler<LogItem<T>> diskBackupHandler;
+
     public RaftNode(Integer nodeId, ArrayList<Integer> nodesList) {
 
         // TODO: are these assertions needed?
@@ -66,7 +73,10 @@ public class RaftNode<T> {
         this.nodeId = nodeId;
         this.nodesList = nodesList;
 
-        if (logFileDetected()) {
+        // Init backup
+        diskBackupHandler = new LogFilesHandler<>(nodeId + "log.dat", nodeId + "status.dat");
+
+        if (diskBackupHandler.logExists()) {
             recoverFromCrash();
         } else
         {
@@ -88,18 +98,9 @@ public class RaftNode<T> {
         votesReceived.clear();
         sentLength.clear();
         ackedLength.clear();
-    }
 
-    /**
-     * This function is used to check if there is already a log file stored by a previous
-     * instance of this node (sharing the same nodeId).
-     *
-     * @return True if log file is found, return false otherwise.
-     */
-    private boolean logFileDetected()
-    {
-        // TODO: implement
-        throw new UnsupportedOperationException();
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+        diskBackupHandler.saveLog(log);
     }
 
     /**
@@ -115,9 +116,25 @@ public class RaftNode<T> {
         ackedLength.clear();
 
         // Recover other state variables from log file
+        currentTerm = 0;
+        votedFor = 0;
+        commitLength = 0;
+        log.clear();
+        try
+        {
+            diskBackupHandler.loadLog(log);
 
-        // TODO: continue implementing
-        throw new UnsupportedOperationException();
+            final LogFilesHandler<LogItem<T>>.StatusStructure s = diskBackupHandler.loadStatus();
+
+            currentTerm = s.currentTerm;
+            votedFor = s.votedFor;
+            commitLength = s.commitLength;
+        }
+        catch (IOException e)
+        {
+            // TODO: improve?
+            System.out.println(e.getMessage());
+        }
     }
 
     /**
@@ -139,6 +156,8 @@ public class RaftNode<T> {
         {
             lastTerm = log.get(log.size() - 1).term;
         }
+
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
 
         // TODO
         // send message to all nodes
@@ -185,6 +204,8 @@ public class RaftNode<T> {
         {
             vote = false;
         }
+
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
 
         // TODO
 //        reply(new VoteResponse(nodeId, currentTerm, vote), cId); // send reply to candidateId
@@ -243,6 +264,8 @@ public class RaftNode<T> {
             // TODO: cancel election timer
             throw new UnsupportedOperationException();
         }
+
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
     }
 
     /**
@@ -274,6 +297,8 @@ public class RaftNode<T> {
                 replicateLog(followerId);
             }
         }
+
+        diskBackupHandler.saveLog(log);
     }
 
     /**
@@ -341,14 +366,18 @@ public class RaftNode<T> {
             final Integer ack = logRequest.prefixLen + logRequest.suffix.size();
             // TODO: send operation successful to leader
             // send(new LogResponse(nodeId, currentTerm, ack, true));
-            throw new UnsupportedOperationException();
+            if(true)
+                throw new UnsupportedOperationException();
         }
         else
         {
             // TODO: send operation failed to leader
             // send(new LogResponse(nodeId, currentTerm, 0, false));
-            throw new UnsupportedOperationException();
+            if(true)
+                throw new UnsupportedOperationException();
         }
+
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
     }
 
     /**
@@ -396,6 +425,8 @@ public class RaftNode<T> {
 
             commitLength = leaderCommit;
         }
+
+        diskBackupHandler.saveLog(log);
     }
 
     /**
@@ -429,6 +460,8 @@ public class RaftNode<T> {
             // TODO: cancel election timer
             throw  new UnsupportedOperationException();
         }
+
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
     }
 
     /**
