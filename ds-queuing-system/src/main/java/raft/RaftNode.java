@@ -1,4 +1,6 @@
 package raft;
+import messages.Message;
+import messages.MessageType;
 import messages.application.LogRequest;
 import messages.application.LogResponse;
 import messages.application.VoteRequest;
@@ -9,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * This class defines the logic of a Raft node.
@@ -16,14 +19,20 @@ import java.util.Objects;
  */
 public class RaftNode<T> {
 
-    /** Number of nodes in the raft network, decided at compile time */
-    private final Integer NUM_NODES = 5;
+    /** Number of nodes in the raft network */
+    private static final Integer NUM_NODES = 5;
+
+    /**
+     * Value of the election timeout, expressed in milliseconds.
+     * TODO: is 5s fine?
+     */
+    private static final Integer ELECTION_TIMEOUT_VALUE = 5000;
 
     /** Used to distinguish node*/
-    private Integer nodeId;
+    private final Integer nodeId;
 
     /** List of nodeId of the other nodes in the network*/
-    private ArrayList<Integer> nodesList;
+    private final ArrayList<Integer> nodesList;
 
     private NodeState currentRole = NodeState.FOLLOWER;
 
@@ -56,10 +65,31 @@ public class RaftNode<T> {
      */
     private HashMap<Integer, Integer> ackedLength = new HashMap<>();
 
+    /**
+     * Handles the backup operations on disk.
+     */
     final private LogFilesHandler<LogItem<T>> diskBackupHandler;
 
-    public RaftNode(Integer nodeId, ArrayList<Integer> nodesList) {
+    /**
+     * Checks if the election process took too much time. In that case
+     * the election is aborted.
+     */
+    TimeoutChecker<Message> electionTimeoutHandler;
 
+    /**
+     * Reference to the queue where events are published.
+     */
+    private LinkedBlockingQueue<Message> eventsQueue;
+
+    /**
+     * Class constructor.
+     *
+     * @param nodeId The univoqe id of the node being created.
+     * @param nodesList The list of id of all the other nodes.
+     * @param eventsQueue The reference to the queue where raft events are published.
+     */
+    public RaftNode(Integer nodeId, ArrayList<Integer> nodesList, LinkedBlockingQueue<Message> eventsQueue)
+    {
         // TODO: are these assertions needed?
         if(nodeId <= 0)
         {
@@ -72,6 +102,7 @@ public class RaftNode<T> {
 
         this.nodeId = nodeId;
         this.nodesList = nodesList;
+        this.eventsQueue = eventsQueue;
 
         // Init backup
         diskBackupHandler = new LogFilesHandler<>(nodeId + "log.dat", nodeId + "status.dat");
@@ -152,17 +183,29 @@ public class RaftNode<T> {
         votesReceived.add(nodeId);
 
         Integer lastTerm = 0;
-        if(log.size() > 0)
+        if(!log.isEmpty())
         {
             lastTerm = log.get(log.size() - 1).term;
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
 
-        // TODO
-        // send message to all nodes
-        // start election timer
-        throw  new UnsupportedOperationException();
+        // TODO: send message to all nodes
+        if(true)
+            throw  new UnsupportedOperationException();
+
+        // Start election timer
+        electionTimeoutHandler = new TimeoutChecker<>(eventsQueue, ELECTION_TIMEOUT_VALUE, new Message(MessageType.ELECTION_TIMEOUT), TimeoutChecker.Mode.SINGLE);
+        electionTimeoutHandler.start();
+    }
+
+    /**
+     * Called after receiving an election timeout event: the election took too much time,
+     * abort and start a new one.
+     */
+    public void onElectionTimeout()
+    {
+        onLeaderTimeout();
     }
 
     /**
@@ -183,7 +226,7 @@ public class RaftNode<T> {
         }
 
         Integer lastTerm = 0;
-        if(log.size() > 0)
+        if(!log.isEmpty())
         {
             lastTerm = log.get(log.size() - 1).term;
         }
@@ -233,13 +276,8 @@ public class RaftNode<T> {
                 currentRole = NodeState.LEADER;
                 currentLeader = nodeId;
 
-                // TODO: cancel election timer
-                if(true)
-                {
-                    // The "if" is needed to ignore the "unreachable statement" error while
-                    // waiting to implement the timer election functionality
-                    throw new UnsupportedOperationException();
-                }
+                // Cancel election timer
+                electionTimeoutHandler.stop();
 
                 for(Integer followerId : nodesList)
                 {
@@ -261,8 +299,9 @@ public class RaftNode<T> {
             currentTerm = term;
             currentRole = NodeState.FOLLOWER;
             votedFor = null;
-            // TODO: cancel election timer
-            throw new UnsupportedOperationException();
+
+            // Cancel election timer
+            electionTimeoutHandler.stop();
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
@@ -346,8 +385,8 @@ public class RaftNode<T> {
             currentTerm = logRequest.term;
             votedFor = null; // TODO: is it consistent?
 
-            // TODO: cancel election timer
-            throw new UnsupportedOperationException();
+            // Cancel election timer
+            electionTimeoutHandler.stop();
         }
 
         if(logRequest.term == currentTerm)
@@ -355,6 +394,8 @@ public class RaftNode<T> {
             currentRole = NodeState.FOLLOWER;
             currentLeader = logRequest.leaderId;
         }
+
+        // TODO: signal heartbeat timeout here?
 
         final Integer prefixLen = logRequest.prefixLen;
         final boolean logOk = (log.size() >= prefixLen) &&
@@ -457,8 +498,10 @@ public class RaftNode<T> {
             currentTerm = logResponse.term;
             currentRole = NodeState.FOLLOWER;
             votedFor = null; // TODO: is it consistent?
-            // TODO: cancel election timer
-            throw  new UnsupportedOperationException();
+
+            // Cancel election timer
+            // TODO: check, why should i stop election timer in the leader?
+            electionTimeoutHandler.stop();
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);

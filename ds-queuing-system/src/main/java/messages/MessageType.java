@@ -6,6 +6,7 @@ package messages;
  */
 public enum MessageType
 {
+    /* ---------- RAFT MESSAGES ---------- */
     /** Message sent from a candidate to all the other nodes. */
     VOTE_REQUEST,
     /** Reply to a vote request, sent by a follower to the candidate. */
@@ -14,6 +15,8 @@ public enum MessageType
     LOG_REQUEST,
     /** Reply message to a log request, sent by a follower to the leader. */
     LOG_RESPONSE,
+    /** Election timeout event (the election process run out of time). */
+    ELECTION_TIMEOUT,
 
     /* ---------- NETWORK MESSAGES ---------- */
     HELLO_REQUEST,
