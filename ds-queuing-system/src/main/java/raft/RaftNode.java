@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * This class defines the logic of a Raft node.
@@ -23,10 +24,32 @@ public class RaftNode<T> {
     private static final Integer NUM_NODES = 5;
 
     /**
-     * Value of the election timeout, expressed in milliseconds.
+     * Value of the election timeout (how much time the election phase has before
+     * aborting). Expressed in milliseconds.
      * TODO: is 5s fine?
      */
     private static final Integer ELECTION_TIMEOUT_VALUE = 5000;
+
+    /**
+     * Value of the leader heartbeat timeout (how much time has to pass before
+     * followers suspect leader failure). Expressed in milliseconds.
+     * TODO: is 3s fine?
+     */
+    private static final Integer LEADER_HEARTBEAT_TIMEOUT_VALUE = 3000;
+
+    /**
+     * Min value of the random offset to be added to LEADER_HEARTBEAT_TIMEOUT_VALUE.
+     * Expressed in milliseconds.
+     * TODO: is 250ms fine?
+     */
+    private static final Integer LEADER_HEARTBEAT_TIMEOUT_MIN_RAND = 250;
+
+    /**
+     * Max value of the random offset to be added to LEADER_HEARTBEAT_TIMEOUT_VALUE.
+     * Expressed in milliseconds.
+     * TODO: is 1s fine?
+     */
+    private static final Integer LEADER_HEARTBEAT_TIMEOUT_MAX_RAND = 1000;
 
     /** Used to distinguish node*/
     private final Integer nodeId;
@@ -34,7 +57,7 @@ public class RaftNode<T> {
     /** List of nodeId of the other nodes in the network*/
     private final ArrayList<Integer> nodesList;
 
-    private NodeState currentRole = NodeState.FOLLOWER;
+    private NodeState currentRole;
 
     private Integer currentTerm = 0;
 
@@ -77,6 +100,12 @@ public class RaftNode<T> {
     TimeoutChecker<Message> electionTimeoutHandler;
 
     /**
+     * Used by followers, checks if too much time has passed since the last
+     * message received from the leader.
+     */
+    TimeoutChecker<Message> leaderHeartbeatTimeoutHandler;
+
+    /**
      * Reference to the queue where events are published.
      */
     private LinkedBlockingQueue<Message> eventsQueue;
@@ -107,31 +136,36 @@ public class RaftNode<T> {
         // Init backup
         diskBackupHandler = new LogFilesHandler<>(nodeId + "log.dat", nodeId + "status.dat");
 
-        if (diskBackupHandler.logExists()) {
-            recoverFromCrash();
-        } else
-        {
-            init();
-        }
-    }
-
-    /**
-     * This function is used to initialize a newly created node of the network.
-     */
-    private void init()
-    {
+        // Init node
         currentRole = NodeState.FOLLOWER;
         currentTerm = 0;
         votedFor = 0;
-        log.clear();
         commitLength = 0;
         currentLeader = 0;
-        votesReceived.clear();
-        sentLength.clear();
-        ackedLength.clear();
 
-        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
-        diskBackupHandler.saveLog(log);
+        if (diskBackupHandler.logExists()) {
+            recoverFromCrash();
+        } else {
+            // Save initial state to disk
+            diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+            diskBackupHandler.saveLog(log);
+        }
+
+        // Start leader heartbeat check
+        startNewHeartbeatTimeout();
+    }
+
+    /**
+     * Utility to handle the creation of the leader heartbeat timeout.
+     */
+    private void startNewHeartbeatTimeout()
+    {
+        leaderHeartbeatTimeoutHandler = new TimeoutChecker<>(eventsQueue,
+                LEADER_HEARTBEAT_TIMEOUT_VALUE + ThreadLocalRandom.current().nextInt(
+                        LEADER_HEARTBEAT_TIMEOUT_MIN_RAND, LEADER_HEARTBEAT_TIMEOUT_MAX_RAND + 1),
+                new Message(MessageType.LEADER_HEARTBEAT_TIMEOUT),
+                TimeoutChecker.Mode.SINGLE);
+        leaderHeartbeatTimeoutHandler.start();
     }
 
     /**
@@ -205,7 +239,17 @@ public class RaftNode<T> {
      */
     public void onElectionTimeout()
     {
+        // Start a new election with a higher term
         onLeaderTimeout();
+    }
+
+    public void onNewLeader()
+    {
+        // It should be already stopped, but I want to be safe
+        leaderHeartbeatTimeoutHandler.stop();
+
+        // Start new leader heartbeat check
+        startNewHeartbeatTimeout();
     }
 
     /**
@@ -215,6 +259,12 @@ public class RaftNode<T> {
      */
     private void onVoteRequest(final VoteRequest voteReq)
     {
+        // Signal message received
+        // I don't stop the timer because the candidate might fail during the election.
+        // That would leave the other followers waiting for him to become the leader.
+        // Should I start an election timer on the followers instead of signaling the reception?
+        leaderHeartbeatTimeoutHandler.eventReceived();
+
         final Integer cLogLastTerm = voteReq.cLogLastTerm;
         final Integer cLogLength = voteReq.cLogLength;
 
@@ -281,7 +331,7 @@ public class RaftNode<T> {
 
                 for(Integer followerId : nodesList)
                 {
-                    if(followerId != nodeId)
+                    if(!Objects.equals(followerId, nodeId))
                     {
                         sentLength.put(followerId, log.size());
                         ackedLength.put(followerId, 0);
@@ -389,18 +439,19 @@ public class RaftNode<T> {
             electionTimeoutHandler.stop();
         }
 
-        if(logRequest.term == currentTerm)
+        if(logRequest.term.equals(currentTerm))
         {
             currentRole = NodeState.FOLLOWER;
             currentLeader = logRequest.leaderId;
         }
 
-        // TODO: signal heartbeat timeout here?
+        // Reset leader heartbeat timer
+        leaderHeartbeatTimeoutHandler.eventReceived();
 
         final Integer prefixLen = logRequest.prefixLen;
         final boolean logOk = (log.size() >= prefixLen) &&
-                (prefixLen == 0 || log.get(prefixLen - 1).term == logRequest.prefixTerm);
-        if(logRequest.term == currentTerm && logOk)
+                (prefixLen == 0 || Objects.equals(log.get(prefixLen - 1).term, logRequest.prefixTerm));
+        if(logRequest.term.equals(currentTerm) && logOk)
         {
             appendEntries(prefixLen, logRequest.leaderCommit, logRequest.suffix);
 
@@ -434,7 +485,7 @@ public class RaftNode<T> {
         // TODO: this function should be called only by followers?
         //  Should I add an assertion for testing?
 
-        if(suffix.size() > 0 && log.size() > prefixLen)
+        if(!suffix.isEmpty() && log.size() > prefixLen)
         {
             int index = Math.min(log.size(), prefixLen + suffix.size()) - 1;
             if(log.get(index).term != suffix.get(index - prefixLen).term)
@@ -478,7 +529,7 @@ public class RaftNode<T> {
      */
     public void onLogResponse(final LogResponse logResponse)
     {
-        if(logResponse.term == currentTerm && currentRole == NodeState.LEADER)
+        if(Objects.equals(logResponse.term, currentTerm) && currentRole == NodeState.LEADER)
         {
             if(logResponse.outcome && logResponse.ack >= ackedLength.get(logResponse.nodeId))
             {

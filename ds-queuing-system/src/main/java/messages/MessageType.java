@@ -17,6 +17,8 @@ public enum MessageType
     LOG_RESPONSE,
     /** Election timeout event (the election process run out of time). */
     ELECTION_TIMEOUT,
+    /** Leader heartbeat timeout event (followers haven't received an update from the leader). */
+    LEADER_HEARTBEAT_TIMEOUT,
 
     /* ---------- NETWORK MESSAGES ---------- */
     HELLO_REQUEST,
