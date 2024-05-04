@@ -6,6 +6,7 @@ import messages.Message;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 
 /**
@@ -18,12 +19,13 @@ public class BrokerNetwork {
     // Locator's connection
     private final LocatorSocket socketToLocator;
 
-    // Other connections on which the broker acts as a server
+    // Other connections on which the broker acts as a server (other brokers or clients)
     private BrokerServerSocket brokerServerSocket;
-    private final HashMap<String, OtherNodeClientHandler> otherNodeClientHandlers = new HashMap<>();
+    private final HashMap<String, OtherNodeClientHandler> otherBrokersClientHandlers = new HashMap<>();
+    private final HashMap<String, OtherNodeClientHandler> clientsClientHandlers = new HashMap<>();
 
-    // Other connections on which the broker acts as a client
-    private final HashMap<String, OtherBrokerSocket> otherBrokerSocketHashMap = new HashMap<>();
+    // Other connections on which the broker acts as a client (only other brokers)
+    private final HashMap<String, OtherBrokerSocket> otherBrokersSockets = new HashMap<>();
 
     // Reference to the broker's controller.
     private final BrokerController brokerController;
@@ -41,18 +43,9 @@ public class BrokerNetwork {
     }
 
     /**
-     * Sends the message specified as parameter to the locator.
-     * If an {@code IOException} occurs, the broker will be disconnected from the server.
-     * @param message The message to be sent.
-     */
-    public void sendMessageToLocator (Message message) {
-        socketToLocator.sendMessage(message);
-    }
-
-    /**
      * Starts and execute the routine that keeps listening to new incoming messages from the locator.
      */
-    public void readMessageFromLocator () {
+    public void readMessagesFromLocator() {
         socketToLocator.readMessage();
     }
 
@@ -84,51 +77,80 @@ public class BrokerNetwork {
         brokerController.update(message, sender);
     }
 
-    public void onBrokerDisconnection(OtherNodeClientHandler otherBrokerClientHandler) {
+    public void onBrokerDisconnection (OtherNodeClientHandler otherNodeClientHandler) {
+        // otherNodeClientHandlers.remove(otherNodeClientHandler.getOtherNodeName());
+        System.out.println("[DISCONNECT] Node with name \"" + otherNodeClientHandler.getOtherNodeName() + "\" disconnected.");
         // TODO: to be managed
     }
 
     /**
-     * Connects to the other broker
-     * @param nodeReference
-     * @return
+     * Connects to another broker.
+     * @param nodeReference Information on the other broker.
      */
-    public boolean connectToOtherBroker (NodeReference nodeReference) {
+    public void connectToOtherBroker (NodeReference nodeReference) {
         try {
             OtherBrokerSocket otherBrokerSocket = new OtherBrokerSocket(
                     nodeReference.getNodeName(),
                     nodeReference.getIpAddress(),
                     nodeReference.getPublicPort(), this);
-            otherBrokerSocketHashMap.put(nodeReference.getNodeName(), otherBrokerSocket);
-            System.out.println("[INFO] Successfully connected to other broker: " + nodeReference);
-            return true;
+            otherBrokersSockets.put(nodeReference.getNodeName(), otherBrokerSocket);
+            System.out.println("[INFO] Successfully connected to broker: " + nodeReference);
         } catch (IOException e) {
-            return false;
+            System.out.println("[EXCEPTION] Unable to connect to broker \"" + nodeReference.getNodeName() + "\".");
+            e.printStackTrace();
         }
     }
 
-    public void sendMessageToBroker (String receiverBroker, Message message) {
-        boolean messageSent = false;
-        if (receiverBroker.equals("all")) {
-            // Used to send a message to all the brokers
-
+    /**
+     * Sends a message to another node (the locator, another broker or a client).
+     * @param receiver Name of the message's receiver.
+     *                       If the receiver is equal to "all-brokers", the message will be sent in broadcast
+     *                       to all the connected brokers.
+     * @param message Message to be sent to the other broker(s).
+     */
+    public void sendMessage (String receiver, Message message) {
+        if (receiver.equalsIgnoreCase("locator")) {
+            // Send the message to the locator
+            socketToLocator.sendMessage(message);
+        } else if (receiver.equalsIgnoreCase("all-brokers")) {
+            // Send a broadcast message to the other brokers
+            otherBrokersSockets.forEach((key, value) -> value.sendMessage(message));
+            otherBrokersClientHandlers.forEach((key, value) -> value.sendMessage(message));
         } else {
-            if (otherBrokerSocketHashMap.containsKey(receiverBroker)) {
-                // The current broker acts as a "client" w.r.t. the other broker
-                OtherBrokerSocket otherBrokerSocket = otherBrokerSocketHashMap.get(receiverBroker);
-                otherBrokerSocket.sendMessage(message);
+            if (otherBrokersSockets.containsKey(receiver)) {
+                // Send a message to another broker (current broker acts as a client)
+                OtherBrokerSocket receiverSocket = otherBrokersSockets.get(receiver);
+                receiverSocket.sendMessage(message);
+            } else if (otherBrokersClientHandlers.containsKey(receiver)) {
+                // Send a message to another broker (current broker acts as a server)
+                OtherNodeClientHandler receiverHandler = otherBrokersClientHandlers.get(receiver);
+                receiverHandler.sendMessage(message);
+            } else if (clientsClientHandlers.containsKey(receiver)) {
+                // Send a message to a connected client
+                OtherNodeClientHandler clientHandler = clientsClientHandlers.get(receiver);
+                clientHandler.sendMessage(message);
             } else {
-                System.out.println("[ERROR] Cannot send the message; broker " + receiverBroker + " not found!");
+                System.out.println("[ERROR] Cannot found the receiver: \"" + receiver + "\".");
             }
         }
     }
 
+    /**
+     * Add another node that requested a connection to this broker. The other node could be either another broker (in
+     * which the current broker acts as a "server" and the other broker as a "client") or an external client.
+     * @param message Hello message, containing the other node's information.
+     * @param otherNodeClientHandler Client handler of the other node.
+     */
     public void addNode(HelloRequestMessage message, OtherNodeClientHandler otherNodeClientHandler) {
-        otherNodeClientHandlers.put(message.getNodeName(), otherNodeClientHandler);
-        NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(),
-                message.getNodePublicPort(),
-                message.getNodeName(),
-                message.isBroker());
+        // Add the reference of the node's client handler to the appropriate HashMap
+        if (message.isBroker()) {
+            otherBrokersClientHandlers.put(message.getNodeName(), otherNodeClientHandler);
+        } else {
+            clientsClientHandlers.put(message.getNodeName(), otherNodeClientHandler);
+        }
+        // Add the reference of the node to the list of connected nodes.
+        NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(), message.getNodePublicPort(),
+                message.getNodeName(), message.isBroker());
         brokerController.addNode(nodeReference);
     }
 }

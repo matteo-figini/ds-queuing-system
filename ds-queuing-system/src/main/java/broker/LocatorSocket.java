@@ -15,7 +15,7 @@ import java.util.concurrent.Executors;
  */
 public class LocatorSocket {
     // Locator's connection
-    private Socket socketToLocator;
+    private final Socket socketToLocator;
     private ObjectInputStream locatorSocketIS;
     private ObjectOutputStream locatorSocketOS;
     private final ExecutorService readFromLocatorService = Executors.newSingleThreadExecutor();
@@ -83,6 +83,7 @@ public class LocatorSocket {
         try {
             if (!socketToLocator.isClosed()) {
                 socketToLocator.close();
+                System.out.println("[INFO] Locator disconnected.");
             }
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to close the connection to the locator properly.");

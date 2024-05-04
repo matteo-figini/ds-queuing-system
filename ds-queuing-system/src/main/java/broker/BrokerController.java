@@ -45,7 +45,7 @@ public class BrokerController {
         }
         int publicPort = brokerNetwork.getBrokerPublicPort();
         HelloRequestMessage helloMessage = new HelloRequestMessage(localIPAddress, publicPort, brokerName, true);
-        brokerNetwork.sendMessageToLocator(helloMessage);
+        brokerNetwork.sendMessage("locator", helloMessage);
     }
 
     /**
@@ -55,7 +55,7 @@ public class BrokerController {
      */
     public void setBrokerNetwork(BrokerNetwork brokerNetwork) {
         this.brokerNetwork = brokerNetwork;
-        brokerNetwork.readMessageFromLocator();
+        brokerNetwork.readMessagesFromLocator();
     }
 
     /**
@@ -69,7 +69,7 @@ public class BrokerController {
                 case HELLO_RESPONSE -> {
                     HelloResponseMessage helloResponseMessage = (HelloResponseMessage) message;
                     if (helloResponseMessage.isConnectionAccepted()) {
-                        brokerNetwork.sendMessageToLocator(new NetDiscoveryRequestMessage());
+                        brokerNetwork.sendMessage("locator", new NetDiscoveryRequestMessage());
                     } else {
                         System.out.println("[ERROR] Cannot connect as a broker to the locator, maybe the " +
                                 "maximum number of allowed brokers is already reached.");
@@ -106,19 +106,22 @@ public class BrokerController {
         System.out.println(nodesConnected);
     }
 
+    /**
+     * Connect to the other brokers already connected in the network, listed in the {@code nodesConnected} list.
+     */
     private void connectToOtherBrokers() {
         for (NodeReference nodeReference : nodesConnected.values()) {
             if (nodeReference.isBroker()) {
                 brokerNetwork.connectToOtherBroker(nodeReference);
                 try {
-                    brokerNetwork.sendMessageToBroker(nodeReference.getNodeName(), new HelloRequestMessage (
+                    brokerNetwork.sendMessage(nodeReference.getNodeName(), new HelloRequestMessage (
                             Inet4Address.getLocalHost().getHostAddress(),
                             brokerNetwork.getBrokerPublicPort(),
                             brokerName,
                             true
                     ));
                 } catch (UnknownHostException e) {
-                    throw new RuntimeException(e);
+                    System.out.println("[EXCEPTION] " + e.getMessage());
                 }
             }
         }

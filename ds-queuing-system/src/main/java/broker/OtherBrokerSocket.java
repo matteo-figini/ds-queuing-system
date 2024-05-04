@@ -49,6 +49,7 @@ public class OtherBrokerSocket {
             this.otherBrokerOS.reset();
         } catch (IOException e) {
             System.out.println("[EXCEPTION] " + e.getMessage());
+            disconnect();
         }
     }
 
@@ -62,13 +63,26 @@ public class OtherBrokerSocket {
                 try {
                     message = (Message) otherBrokerIS.readObject();
                 } catch (IOException | ClassNotFoundException e) {
-                    // disconnectFromLocator();
                     message = null;
-                    readFromBrokerService.shutdownNow();
+                    disconnect();
                 }
                 brokerNetworkRef.onMessageReceived(message, otherBrokerName);
             }
         });
+    }
+
+    /**
+     * Disconnect the broker from the other broker, closing the socket and stopping the reading service.
+     */
+    public void disconnect () {
+        if (!readFromBrokerService.isShutdown()) readFromBrokerService.shutdownNow();
+        try {
+            if (!socket.isClosed()) socket.close();
+            System.out.println("[DISCONNECT] Disconnected from broker " + otherBrokerName);
+            // TODO: disconnection of another broker must be handled.
+        } catch (IOException e) {
+            System.out.println("[EXCEPTION] Unable to disconnect from " + otherBrokerName + ": " + e.getMessage());
+        }
     }
 
     /**

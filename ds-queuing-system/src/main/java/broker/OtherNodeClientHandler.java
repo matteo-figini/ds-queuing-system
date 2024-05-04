@@ -105,9 +105,7 @@ public class OtherNodeClientHandler implements Runnable {
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to close the BrokerSocket: " + e.getMessage());
         }
-        if (!Thread.currentThread().isInterrupted()) {
-            Thread.currentThread().interrupt();
-        }
+        if (!Thread.currentThread().isInterrupted()) Thread.currentThread().interrupt();
         brokerNetworkRef.onBrokerDisconnection(this);
     }
 

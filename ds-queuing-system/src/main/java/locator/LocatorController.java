@@ -9,6 +9,9 @@ import messages.network.NetDiscoveryResponseMessage;
 import misc.NodeReference;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class represents the controller of the locator. It stores the set of brokers and clients
@@ -61,7 +64,9 @@ public class LocatorController {
      * @param nodeHandler The {@code NodeHandler} representing the reference to the connected node.
      */
     public void addNode (HelloRequestMessage message, NodeHandler nodeHandler) {
+        ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
         nodeHandler.setNodeName(message.getNodeName());
+        System.out.println("[INFO] Set node name: " + nodeHandler.getNodeName());
         if (message.isBroker() && brokersConnected >= maximumBrokerNumber) {
             System.out.println("[ERROR] Number of maximum brokers already reached: unable to connect " + message.getNodeName());
             nodeHandler.sendMessage(new HelloResponseMessage(false));
@@ -70,10 +75,8 @@ public class LocatorController {
             // - Set the name of the connected node
             // - Add the corresponding NodeHandler to the map associating the name to the NodeHandler;
             // - Create a NodeReference and add it to the list.
-            nodeHandlers.put(message.getNodeName(), nodeHandler);
-            if (message.isBroker()) {
-                brokersConnected++;
-            }
+            nodeHandlers.put(nodeHandler.getNodeName(), nodeHandler);
+            if (message.isBroker()) brokersConnected++;
             NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(),
                     message.getNodePublicPort(),
                     message.getNodeName(),
@@ -84,18 +87,15 @@ public class LocatorController {
                     "[INFO] Added new client: " + nodeReference);
             nodeHandler.sendMessage(new HelloResponseMessage(true));
 
-            /*System.out.println("[DEBUG] Number of connected brokers: " + brokersConnected);
+            // If all the required brokers are connected, send a message to all the brokers.
+            // A small delay is set to allow all the residual messages to be properly exchanged.
             if (brokersConnected == maximumBrokerNumber) {
-                // Send a message to all the brokers confirming that network is set up.
-                for (NodeReference nodeRef : nodesConnected) {
-                    if (nodeRef.isBroker()) {
-                        NodeHandler handler = nodeHandlers.get(nodeRef.getNodeName());
-                        if (handler != null) {
-                            handler.sendMessage(new BrokersReadyMessage());
-                        }
-                    }
-                }
-            }*/
+                startRunning.schedule(() -> {
+                    nodesConnected.stream().filter(NodeReference::isBroker).map(node ->
+                            nodeHandlers.get(node.getNodeName())).filter(Objects::nonNull).forEach(handler ->
+                                handler.sendMessage(new BrokersReadyMessage()));
+                }, 1500, TimeUnit.MILLISECONDS);
+            }
         }
     }
 
@@ -117,17 +117,17 @@ public class LocatorController {
      * Remove all the references of the {@code NodeHandler} passed as parameter.
      * If the {@code NodeHandler} has the parameter "nodeName" already set, remove it also from the list of
      * {@code NodeReference} stored by the {@code LocatorController}.
+     * If the removed node was a broker, decrease the number of brokers.
      * @param nodeHandler The node to be removed from the locator. The NodeHandler must have the attribute "nodeName"
      *                    must be properly set, otherwise a {@code NullPointerException} will be raised.
      */
     public void disconnectNode (NodeHandler nodeHandler) {
-        // TODO: if the node disconnected is a broker, reduce the number of brokers connected.
-        try {
-            nodesConnected.removeIf(nodeReference -> nodeReference.getNodeName().equals(nodeHandler.getNodeName()));
-            nodeHandlers.remove(nodeHandler.getNodeName());
-            System.out.println("[INFO] Removed NodeHandler of node " + nodeHandler.getNodeName() + " from the locator.");
-        } catch (NullPointerException e) {
-            System.out.println("[EXCEPTION] Node handler name " + nodeHandler + " not found.");
-        }
+        // If the node to be deleted is a broker, reduce the number of brokers
+        nodesConnected.stream().filter(node -> node.isBroker() && node.getNodeName().equals(nodeHandler.getNodeName())).forEach(node -> brokersConnected--);
+        // Remove the node from the list "nodesConnected" and from the hashmap "nodeHandlers".
+        nodesConnected.removeIf(node -> node.getNodeName().equals(nodeHandler.getNodeName()));
+        nodeHandlers.remove(nodeHandler.getNodeName());
+        System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\" from the locator.");
+        System.out.println("[INFO] Brokers connected: " + brokersConnected);
     }
 }

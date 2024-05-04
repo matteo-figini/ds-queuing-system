@@ -6,14 +6,19 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 /**
- * This class represents the broker's server socket that is actively listening for new connection
- * from other brokers. The behaviour is similar to a generic {@code ServerSocket} for a server.
+ * This class represents the broker's server socket actively listening for new connection
+ * from other brokers. The behavior is similar to a generic {@code ServerSocket} for a server.
  */
 public class BrokerServerSocket implements Runnable {
     private ServerSocket brokerServerSocket;
     private final BrokerNetwork brokerNetworkRef;
     private final int publicPort;
 
+    /**
+     * Create the {@code BrokerServerSocket}.
+     * @param publicPort Public port on which the broker keeps listening for new connections.
+     * @param brokerNetworkRef Reference to the {@code BrokerNetwork}.
+     */
     public BrokerServerSocket (int publicPort, BrokerNetwork brokerNetworkRef) {
         this.publicPort = publicPort;
         this.brokerNetworkRef = brokerNetworkRef;
