@@ -8,34 +8,8 @@ import java.io.Serializable;
  * the node name and a boolean flag indicating whether the node is a broker or not (True if the node is broker,
  * False if the node is a client.
  */
-public class NodeReference implements Serializable {
-    private String ipAddress;
-    private int publicPort;
-    private String nodeName;
-    private boolean isBroker;
-
-    public NodeReference(String ipAddress, int publicPort, String nodeName, boolean isBroker) {
-        this.publicPort = publicPort;
-        this.ipAddress = ipAddress;
-        this.nodeName = nodeName;
-        this.isBroker = isBroker;
-    }
-
-    public String getIpAddress() {
-        return ipAddress;
-    }
-
-    public int getPublicPort() {
-        return publicPort;
-    }
-
-    public String getNodeName() {
-        return nodeName;
-    }
-
-    public boolean isBroker() {
-        return isBroker;
-    }
+public record NodeReference(String ipAddress, int publicPort, String nodeName,
+                            boolean isBroker) implements Serializable {
 
     @Override
     public String toString() {

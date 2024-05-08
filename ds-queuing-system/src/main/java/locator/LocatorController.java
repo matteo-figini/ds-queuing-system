@@ -92,7 +92,7 @@ public class LocatorController {
             if (brokersConnected == maximumBrokerNumber) {
                 startRunning.schedule(() -> {
                     nodesConnected.stream().filter(NodeReference::isBroker).map(node ->
-                            nodeHandlers.get(node.getNodeName())).filter(Objects::nonNull).forEach(handler ->
+                            nodeHandlers.get(node.nodeName())).filter(Objects::nonNull).forEach(handler ->
                                 handler.sendMessage(new BrokersReadyMessage()));
                 }, 1500, TimeUnit.MILLISECONDS);
             }
@@ -123,9 +123,9 @@ public class LocatorController {
      */
     public void disconnectNode (NodeHandler nodeHandler) {
         // If the node to be deleted is a broker, reduce the number of brokers
-        nodesConnected.stream().filter(node -> node.isBroker() && node.getNodeName().equals(nodeHandler.getNodeName())).forEach(node -> brokersConnected--);
+        nodesConnected.stream().filter(node -> node.isBroker() && node.nodeName().equals(nodeHandler.getNodeName())).forEach(node -> brokersConnected--);
         // Remove the node from the list "nodesConnected" and from the hashmap "nodeHandlers".
-        nodesConnected.removeIf(node -> node.getNodeName().equals(nodeHandler.getNodeName()));
+        nodesConnected.removeIf(node -> node.nodeName().equals(nodeHandler.getNodeName()));
         nodeHandlers.remove(nodeHandler.getNodeName());
         System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\" from the locator.");
         System.out.println("[INFO] Brokers connected: " + brokersConnected);

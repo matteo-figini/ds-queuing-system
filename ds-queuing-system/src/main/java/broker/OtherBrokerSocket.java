@@ -78,8 +78,7 @@ public class OtherBrokerSocket {
         if (!readFromBrokerService.isShutdown()) readFromBrokerService.shutdownNow();
         try {
             if (!socket.isClosed()) socket.close();
-            System.out.println("[DISCONNECT] Disconnected from broker " + otherBrokerName);
-            // TODO: disconnection of another broker must be handled.
+            brokerNetworkRef.onNodeServerDisconnection(this);
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to disconnect from " + otherBrokerName + ": " + e.getMessage());
         }

@@ -39,9 +39,9 @@ public class BrokerController {
         try {
             localIPAddress = Inet4Address.getLocalHost().getHostAddress();
         } catch (UnknownHostException e) {
-            System.out.println("[EXCEPTION] Unable to retrieve the local IP address: " + e.getMessage());
-            System.out.println("[EXCEPTION] Adding the default address \"127.0.0.1\".");
             localIPAddress = "127.0.0.1";
+            System.out.println("[EXCEPTION] Unable to retrieve the local IP address: " + e.getMessage());
+            System.out.println("[EXCEPTION] Adding the default address: " + localIPAddress);
         }
         int publicPort = brokerNetwork.getBrokerPublicPort();
         HelloRequestMessage helloMessage = new HelloRequestMessage(localIPAddress, publicPort, brokerName, true);
@@ -79,8 +79,8 @@ public class BrokerController {
                 case NET_DISCOVERY_RESPONSE -> {
                     NetDiscoveryResponseMessage netDiscoveryResponseMessage = (NetDiscoveryResponseMessage) message;
                     for (NodeReference nodeReference : netDiscoveryResponseMessage.getBrokersConnected()) {
-                        if (!nodeReference.getNodeName().equals(brokerName)) {
-                            nodesConnected.put(nodeReference.getNodeName(), nodeReference);
+                        if (!nodeReference.nodeName().equals(brokerName)) {
+                            nodesConnected.put(nodeReference.nodeName(), nodeReference);
                         }
                     }
                     connectToOtherBrokers();
@@ -95,13 +95,17 @@ public class BrokerController {
         }
     }
 
+    public void handleDisconnection (String disconnectedNode) {
+
+    }
+
     /**
      * Add the reference of the {@code NodeReference} passed as parameter to the map associating each string (the name
      * of the node) to the corresponding {@code NodeReference} and print a message.
      * @param nodeReference Representation of the new connected node.
      */
     public void addNode (NodeReference nodeReference) {
-        nodesConnected.put(nodeReference.getNodeName(), nodeReference);
+        nodesConnected.put(nodeReference.nodeName(), nodeReference);
         System.out.println("[INFO] New node connected: " + nodeReference);
         System.out.println(nodesConnected);
     }
@@ -114,7 +118,7 @@ public class BrokerController {
             if (nodeReference.isBroker()) {
                 brokerNetwork.connectToOtherBroker(nodeReference);
                 try {
-                    brokerNetwork.sendMessage(nodeReference.getNodeName(), new HelloRequestMessage (
+                    brokerNetwork.sendMessage(nodeReference.nodeName(), new HelloRequestMessage (
                             Inet4Address.getLocalHost().getHostAddress(),
                             brokerNetwork.getBrokerPublicPort(),
                             brokerName,
