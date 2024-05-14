@@ -9,7 +9,7 @@ import messages.MessageType;
  */
 public class LogResponse extends Message {
 
-    public final Integer nodeId;
+    public final String nodeId;
     public final Integer term;
     public final Integer ack;
     public final boolean outcome;
@@ -22,7 +22,7 @@ public class LogResponse extends Message {
      * @param ack The number of entries of the log request that are acked.
      * @param outcome The outcome of the log request operation.
      */
-    public LogResponse(Integer nodeId, Integer term, Integer ack, boolean outcome)
+    public LogResponse(String nodeId, Integer term, Integer ack, boolean outcome)
     {
         super(MessageType.LOG_RESPONSE);
 

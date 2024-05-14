@@ -8,7 +8,7 @@ import messages.MessageType;
  */
 public class VoteRequest extends Message {
 
-    public final Integer cId;
+    public final String cId;
 
     public final Integer cTerm;
 
@@ -24,7 +24,7 @@ public class VoteRequest extends Message {
      * @param cLogLength Length of the candidate's log.
      * @param cLogLastTerm Term of the last entry in the candidate's log.
      */
-    public VoteRequest(Integer cId, Integer cTerm, Integer cLogLength, Integer cLogLastTerm)
+    public VoteRequest(String cId, Integer cTerm, Integer cLogLength, Integer cLogLastTerm)
     {
         super(MessageType.VOTE_REQUEST);
 

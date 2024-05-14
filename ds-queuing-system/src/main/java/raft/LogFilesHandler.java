@@ -15,9 +15,9 @@ public class LogFilesHandler<T> {
     public class StatusStructure
     {
         public final Integer currentTerm;
-        public final Integer votedFor;
+        public final String votedFor;
         public final Integer commitLength;
-        public StatusStructure(Integer currentTerm, Integer votedFor, Integer commitLength)
+        public StatusStructure(Integer currentTerm, String votedFor, Integer commitLength)
         {
             this.currentTerm = currentTerm;
             this.votedFor = votedFor;
@@ -63,7 +63,7 @@ public class LogFilesHandler<T> {
      *
      * @return True if operation successful, false otherwise.
      */
-    public boolean saveStatus(final Integer currentTerm, final Integer votedFor, final Integer commitLength)
+    public boolean saveStatus(final Integer currentTerm, final String votedFor, final Integer commitLength)
     {
         // TODO: error handling
         try
@@ -124,7 +124,7 @@ public class LogFilesHandler<T> {
     public StatusStructure loadStatus() throws IOException
     {
         Integer currentTerm = 0;
-        Integer votedFor = 0;
+        String votedFor = "";
         Integer commitLength = 0;
 
         if(!logExists())
@@ -139,7 +139,7 @@ public class LogFilesHandler<T> {
             ObjectInputStream ois = new ObjectInputStream(fis);
 
             currentTerm = (Integer) ois.readObject();
-            votedFor = (Integer) ois.readObject();
+            votedFor = (String) ois.readObject();
             commitLength = (Integer) ois.readObject();
 
             ois.close();

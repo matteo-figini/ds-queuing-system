@@ -52,17 +52,17 @@ public class RaftNode<T> {
     private static final Integer LEADER_HEARTBEAT_TIMEOUT_MAX_RAND = 1000;
 
     /** Used to distinguish node*/
-    private final Integer nodeId;
+    private final String nodeId;
 
     /** List of nodeId of the other nodes in the network*/
-    private final ArrayList<Integer> nodesList;
+    private final ArrayList<String> nodesList;
 
     private NodeState currentRole;
 
     private Integer currentTerm = 0;
 
     /** Id of the node we last have voted for*/
-    private Integer votedFor = 0;
+    private String votedFor = null;
 
     /** Log of the node*/
     private ArrayList<LogItem<T>> log = new ArrayList<>();
@@ -71,22 +71,22 @@ public class RaftNode<T> {
     private Integer commitLength = 0;
 
     /** Id of the current leader node*/
-    private Integer currentLeader = 0;
+    private String currentLeader = null;
 
     /** Votes received by this node during the election*/
-    private ArrayList<Integer> votesReceived = new ArrayList<>();
+    private ArrayList<String> votesReceived = new ArrayList<>();
 
     /**
      * Number of log records that we have already sent to a particular node.
      * The key is the nodeId of the receiving node, the value is the actual length.
      */
-    private HashMap<Integer, Integer> sentLength = new HashMap<>();
+    private HashMap<String, Integer> sentLength = new HashMap<>();
 
     /**
      * Number of log entries that a particular node acknowledged as having received.
      * The key is the nodeId of the node sending acks, the value is the actual number.
      */
-    private HashMap<Integer, Integer> ackedLength = new HashMap<>();
+    private HashMap<String, Integer> ackedLength = new HashMap<>();
 
     /**
      * Handles the backup operations on disk.
@@ -117,13 +117,9 @@ public class RaftNode<T> {
      * @param nodesList The list of id of all the other nodes.
      * @param eventsQueue The reference to the queue where raft events are published.
      */
-    public RaftNode(Integer nodeId, ArrayList<Integer> nodesList, LinkedBlockingQueue<Message> eventsQueue)
+    public RaftNode(String nodeId, ArrayList<String> nodesList, LinkedBlockingQueue<Message> eventsQueue)
     {
         // TODO: are these assertions needed?
-        if(nodeId <= 0)
-        {
-            throw new RuntimeException("nodeId should be >0");
-        }
         if(NUM_NODES % 2 == 0 || NUM_NODES < 3)
         {
             throw new RuntimeException("NUM_NODES should be and odd number >1");
@@ -139,9 +135,9 @@ public class RaftNode<T> {
         // Init node
         currentRole = NodeState.FOLLOWER;
         currentTerm = 0;
-        votedFor = 0;
+        votedFor = null;
         commitLength = 0;
-        currentLeader = 0;
+        currentLeader = null;
 
         if (diskBackupHandler.logExists()) {
             recoverFromCrash();
@@ -153,6 +149,48 @@ public class RaftNode<T> {
 
         // Start leader heartbeat check
         startNewHeartbeatTimeout();
+    }
+
+    /**
+     * This function waits on eventsQueue for new events to be handled.
+     */
+    public void waitForEvents()
+    {
+        while(true)
+        {
+            try
+            {
+                Message m = eventsQueue.take();
+
+                switch (m.type)
+                {
+                    default:
+                        break;
+                    case VOTE_REQUEST:
+                        this.onVoteRequest((VoteRequest) m);
+                        break;
+                    case VOTE_RESPONSE:
+                        this.onVoteResponse((VoteResponse) m);
+                        break;
+                    case LOG_REQUEST:
+                        this.onLogRequest((LogRequest<T>) m);
+                        break;
+                    case LOG_RESPONSE:
+                        this.onLogResponse((LogResponse) m);
+                        break;
+                    case ELECTION_TIMEOUT:
+                        this.onElectionTimeout();
+                        break;
+                    case LEADER_HEARTBEAT_TIMEOUT:
+                        this.onLeaderTimeout();
+                        break;
+                }
+            }
+            catch(Exception e)
+            {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -175,14 +213,14 @@ public class RaftNode<T> {
     private void recoverFromCrash()
     {
         currentRole = NodeState.FOLLOWER;
-        currentLeader = 0;
+        currentLeader = null;
         votesReceived.clear();
         sentLength.clear();
         ackedLength.clear();
 
         // Recover other state variables from log file
         currentTerm = 0;
-        votedFor = 0;
+        votedFor = null;
         commitLength = 0;
         log.clear();
         try
@@ -207,7 +245,7 @@ public class RaftNode<T> {
      * an extended period of time. The node goes into candidate state and starts
      * an election.
      */
-    public void onLeaderTimeout()
+    private void onLeaderTimeout()
     {
         currentTerm += 1;
         currentRole = NodeState.CANDIDATE;
@@ -237,13 +275,13 @@ public class RaftNode<T> {
      * Called after receiving an election timeout event: the election took too much time,
      * abort and start a new one.
      */
-    public void onElectionTimeout()
+    private void onElectionTimeout()
     {
         // Start a new election with a higher term
         onLeaderTimeout();
     }
 
-    public void onNewLeader()
+    private void onNewLeader()
     {
         // It should be already stopped, but I want to be safe
         leaderHeartbeatTimeoutHandler.stop();
@@ -312,7 +350,7 @@ public class RaftNode<T> {
      */
     private void onVoteResponse(final VoteResponse voteReply)
     {
-        final Integer voterId = voteReply.voterId;
+        final String voterId = voteReply.voterId;
         final Integer term = voteReply.voterCurrentTerm;
         final boolean vote = voteReply.vote;
 
@@ -329,7 +367,7 @@ public class RaftNode<T> {
                 // Cancel election timer
                 electionTimeoutHandler.stop();
 
-                for(Integer followerId : nodesList)
+                for(String followerId : nodesList)
                 {
                     if(!Objects.equals(followerId, nodeId))
                     {
@@ -379,7 +417,7 @@ public class RaftNode<T> {
         // Update ackedLength of the leader
         ackedLength.put(nodeId, log.size());
 
-        for(Integer followerId : nodesList)
+        for(String followerId : nodesList)
         {
             if(!Objects.equals(followerId, nodeId)) // Avoid leader sending to himself
             {
@@ -397,7 +435,7 @@ public class RaftNode<T> {
      *
      * @param followerId The id of the follower that will receive the message.
      */
-    private void replicateLog(Integer followerId)
+    private void replicateLog(String followerId)
     {
         // TODO: remove this check
         if(currentRole != NodeState.LEADER)
@@ -428,7 +466,7 @@ public class RaftNode<T> {
      *
      * @param logRequest The message received from the leader.
      */
-    public void onLogRequest(final LogRequest<T> logRequest)
+    private void onLogRequest(final LogRequest<T> logRequest)
     {
         if(logRequest.term > currentTerm)
         {
@@ -527,7 +565,7 @@ public class RaftNode<T> {
      *
      * @param logResponse The response message.
      */
-    public void onLogResponse(final LogResponse logResponse)
+    private void onLogResponse(final LogResponse logResponse)
     {
         if(Objects.equals(logResponse.term, currentTerm) && currentRole == NodeState.LEADER)
         {
@@ -572,7 +610,7 @@ public class RaftNode<T> {
         while(commitLength < log.size() && keepGoing)
         {
             int acks = 0;
-            for(Integer node : nodesList)
+            for(String node : nodesList)
             {
                 if(ackedLength.get(node) > commitLength)
                 {

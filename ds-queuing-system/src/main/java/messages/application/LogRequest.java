@@ -12,7 +12,7 @@ import java.util.List;
  */
 public class LogRequest<T> extends Message {
 
-    public final Integer leaderId;
+    public final String leaderId;
     public final Integer term;
     public final Integer prefixLen;
     public final Integer prefixTerm;
@@ -30,7 +30,7 @@ public class LogRequest<T> extends Message {
      * @param leaderCommit Number of log entries committed by the leader.
      * @param suffix The actual entries to be added to the log.
      */
-    public LogRequest(Integer leaderId, Integer term, Integer prefixLen, Integer prefixTerm,
+    public LogRequest(String leaderId, Integer term, Integer prefixLen, Integer prefixTerm,
                       Integer leaderCommit, List<LogItem<T>> suffix)
     {
         super(MessageType.LOG_REQUEST);

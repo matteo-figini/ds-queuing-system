@@ -9,7 +9,7 @@ import messages.MessageType;
  */
 public class VoteResponse extends Message {
 
-    public final Integer voterId;
+    public final String voterId;
 
     public final Integer voterCurrentTerm;
 
@@ -22,7 +22,7 @@ public class VoteResponse extends Message {
      * @param voterCurrentTerm Current term of the voter node.
      * @param vote True if the vote is granted to the candidate, false otherwise.
      */
-    public VoteResponse(Integer voterId, Integer voterCurrentTerm, boolean vote)
+    public VoteResponse(String voterId, Integer voterCurrentTerm, boolean vote)
     {
         super(MessageType.VOTE_RESPONSE);
 
