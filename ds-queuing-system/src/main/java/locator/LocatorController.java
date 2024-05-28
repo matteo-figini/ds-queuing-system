@@ -89,6 +89,7 @@ public class LocatorController {
 
             // If all the required brokers are connected, send a message to all the brokers.
             // A small delay is set to allow all the residual messages to be properly exchanged.
+            // TODO: move away from here
             if (brokersConnected == maximumBrokerNumber) {
                 startRunning.schedule(() -> {
                     nodesConnected.stream().filter(NodeReference::isBroker).map(node ->

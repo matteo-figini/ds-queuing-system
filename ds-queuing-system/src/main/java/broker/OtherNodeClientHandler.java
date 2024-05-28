@@ -33,7 +33,6 @@ public class OtherNodeClientHandler implements Runnable {
     public OtherNodeClientHandler(BrokerNetwork brokerNetworkRef, Socket brokerSocket) {
         this.brokerNetworkRef = brokerNetworkRef;
         this.brokerSocket = brokerSocket;
-
         // Open the streams on the socket
         try {
             this.brokerSocketOS = new ObjectOutputStream(brokerSocket.getOutputStream());
