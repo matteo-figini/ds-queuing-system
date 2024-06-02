@@ -11,7 +11,7 @@ public class CreateQueueRequest extends Message {
     private final String queueName;       // Name of the new queue
 
     /**
-     * Create a new message of type "CreateQueueRequest".
+     * Create a new message of type {@code CreateQueueRequest}.
      * @param queueName Name of the new queue.
      */
     public CreateQueueRequest(String queueName) {
@@ -19,6 +19,9 @@ public class CreateQueueRequest extends Message {
         this.queueName = queueName;
     }
 
+    /**
+     * @return The name of the new created queue.
+     */
     public String getQueueName() {
         return queueName;
     }

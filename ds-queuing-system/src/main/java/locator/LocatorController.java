@@ -1,11 +1,8 @@
 package locator;
 
 import messages.Message;
-import messages.MessageType;
-import messages.network.BrokersReadyMessage;
-import messages.network.HelloRequestMessage;
-import messages.network.HelloResponseMessage;
-import messages.network.NetDiscoveryResponseMessage;
+import messages.network.*;
+import misc.NetworkState;
 import misc.NodeReference;
 
 import java.util.*;
@@ -23,6 +20,9 @@ public class LocatorController {
     private final List<NodeReference> nodesConnected = new ArrayList<>();
     private int brokersConnected = 0;
     private final int maximumBrokerNumber;
+    private NodeReference leader;   // Reference to the current leader of the network
+
+    private NetworkState networkState;
 
     /**
      * Create the {@code LocatorController} and set the maximum number of brokers allowed.
@@ -30,6 +30,7 @@ public class LocatorController {
      */
     public LocatorController (int brokers) {
         this.maximumBrokerNumber = brokers;
+        this.networkState = NetworkState.CONNECTING_BROKERS;
     }
 
     /**
@@ -46,11 +47,24 @@ public class LocatorController {
      * @param message The message received.
      */
     public void onMessageReceived (Message message, NodeHandler senderReference) {
-        if (Objects.requireNonNull(message.type) == MessageType.NET_DISCOVERY_REQUEST) {
-            List<NodeReference> brokersConnected = getConnectedBrokers();
-            senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected));
-        } else {
-            System.out.println("[ERROR] Message type " + message.type + " not supported.");
+        switch (Objects.requireNonNull(message.type)) {
+            case NET_DISCOVERY_REQUEST -> {
+                List<NodeReference> brokersConnected = getConnectedBrokers();
+                senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected));
+            }
+            case LEADER_DISCOVERY_REQUEST -> {
+                // The sender (a client) is asking for the details of the leader.
+                LeaderDiscoveryResponse response;
+                if (this.leader == null) {
+                    response = new LeaderDiscoveryResponse(true, null);
+                } else {
+                    response = new LeaderDiscoveryResponse(false, this.leader);
+                }
+                senderReference.sendMessage(response);
+            }
+            default -> {
+                System.out.println("[ERROR] Message type " + message.type + " not supported.");
+            }
         }
     }
 
@@ -85,17 +99,19 @@ public class LocatorController {
             System.out.println(message.isBroker() ?
                     "[INFO] Added new broker: " + nodeReference :
                     "[INFO] Added new client: " + nodeReference);
+            System.out.println(nodesConnected);
             nodeHandler.sendMessage(new HelloResponseMessage(true));
 
             // If all the required brokers are connected, send a message to all the brokers.
             // A small delay is set to allow all the residual messages to be properly exchanged.
-            // TODO: move away from here
-            if (brokersConnected == maximumBrokerNumber) {
+            // TODO: move away from here --> where?
+            if (networkState == NetworkState.CONNECTING_BROKERS && brokersConnected == maximumBrokerNumber) {
+                this.networkState = NetworkState.NETWORK_CONNECTED;
                 startRunning.schedule(() -> {
                     nodesConnected.stream().filter(NodeReference::isBroker).map(node ->
                             nodeHandlers.get(node.nodeName())).filter(Objects::nonNull).forEach(handler ->
                                 handler.sendMessage(new BrokersReadyMessage()));
-                }, 1500, TimeUnit.MILLISECONDS);
+                }, 1000, TimeUnit.MILLISECONDS);
             }
         }
     }
@@ -130,5 +146,16 @@ public class LocatorController {
         nodeHandlers.remove(nodeHandler.getNodeName());
         System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\" from the locator.");
         System.out.println("[INFO] Brokers connected: " + brokersConnected);
+    }
+
+    /**
+     * Set the leader broker of the network by finding the first occurrence in the {@code nodesConnected} list of the
+     * {@code NodeReference} with the same name as the string passed as parameter.
+     * @param leaderBroker Name of the current network's leader.
+     */
+    private void setLeaderBroker (String leaderBroker) {
+        leader = nodesConnected.stream()
+                .filter(nodeReference -> nodeReference.isBroker() && nodeReference.nodeName().equals(leaderBroker))
+                .findFirst().orElse(this.leader);
     }
 }

@@ -15,16 +15,27 @@ public class AppendQueueRequest extends Message {
     private final String queueName;
     private final List<Integer> appendElements;
 
+    /**
+     * Create a new message of type {@code AppendQueueRequest}.
+     * @param queueName Name of the queue to which append the new data.
+     * @param newElements List of the elements that will be appended to the queue.
+     */
     public AppendQueueRequest(String queueName, List<Integer> newElements) {
         super(MessageType.APPEND_QUEUE_REQUEST);
         this.queueName = queueName;
         this.appendElements = new ArrayList<>(newElements);
     }
 
+    /**
+     * @return Name of the queue to which append the new data.
+     */
     public String getQueueName() {
         return queueName;
     }
 
+    /**
+     * @return List of the elements that will be appended to the queue.
+     */
     public List<Integer> getAppendElements() {
         return appendElements;
     }

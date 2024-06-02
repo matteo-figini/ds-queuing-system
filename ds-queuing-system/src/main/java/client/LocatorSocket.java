@@ -69,7 +69,7 @@ public class LocatorSocket {
                     message = null;
                     readFromLocatorService.shutdown();
                 }
-                // clientNetwork.onMessageReceived(message, "locator");
+                clientNetwork.onMessageReceived(message, "locator");
             }
         });
     }

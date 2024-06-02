@@ -13,6 +13,10 @@ public class CreateQueueResponse extends Message {
     private final boolean status;
     private String infoMessage;
 
+    /**
+     *
+     * @param status
+     */
     public CreateQueueResponse (boolean status) {
         super(MessageType.CREATE_QUEUE_RESPONSE);
         this.status = status;
