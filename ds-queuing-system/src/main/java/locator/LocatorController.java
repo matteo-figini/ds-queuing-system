@@ -41,6 +41,7 @@ public class LocatorController {
         this.locatorNetworkRef = locatorNetworkRef;
     }
 
+    /* ---------- MESSAGE HANDLING ---------- */
     /**
      * Handles the receiving of a message.
      * If the message type is not supported, an error message is printed on the standard output.

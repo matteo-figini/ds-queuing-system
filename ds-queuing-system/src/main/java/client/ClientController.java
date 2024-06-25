@@ -17,6 +17,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+/**
+ * This class handles the logic of the client of the network.
+ */
 public class ClientController {
     private final String clientName;
     private ClientNetwork clientNetwork;
@@ -73,29 +76,42 @@ public class ClientController {
     public void update (Message message, String sender) {
         if (message != null) {
             switch (message.type) {
-                case HELLO_RESPONSE -> {
-                    HelloResponseMessage helloResponseMessage = (HelloResponseMessage) message;
-                    if (helloResponseMessage.isConnectionAccepted()) {
-                        System.out.println("[INFO] Connection to the locator accepted.");
-                        clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest());
-                    } else {
-                        System.out.println("[ERROR] Cannot connect as a client to the locator.");
-                        System.exit(0);
-                    }
-                }
-                case LEADER_DISCOVERY_RESPONSE -> {
-                    LeaderDiscoveryResponse leaderDiscoveryResponse = (LeaderDiscoveryResponse) message;
-                    if (leaderDiscoveryResponse.absenceOfLeader()) {
-                        final int waitingSeconds = 20;
-                        System.out.println("[INFO] No available leader now: retrying in " + waitingSeconds + " seconds...");
-                        ScheduledExecutorService retrySendingMessage = Executors.newSingleThreadScheduledExecutor();
-                        retrySendingMessage.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()), waitingSeconds, TimeUnit.SECONDS);
-                    } else {
-                        System.out.println("[INFO] Setting available leader: " + leaderDiscoveryResponse.getLeaderReference().nodeName());
-                        // TODO: instantiate the connection to the leader
-                    }
-                }
+                case HELLO_RESPONSE -> onHelloResponseMessage((HelloResponseMessage) message, sender);
+                case LEADER_DISCOVERY_RESPONSE -> onLeaderDiscoveryResponse((LeaderDiscoveryResponse) message, sender);
+                default -> System.out.println("[EXCEPTION] Unhandled message type: " + message.type);
             }
+        }
+    }
+
+    /**
+     * Handles the receiving of a {@code HelloResponseMessage}.
+     * @param message Message received.
+     * @param sender Sender of the message (the locator should be the sender of the message).
+     */
+    private void onHelloResponseMessage (HelloResponseMessage message, String sender) {
+        if (message.isConnectionAccepted()) {
+            System.out.println("[INFO] From " + sender + ": connection to the locator accepted.");
+            clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest());
+        } else {
+            System.out.println("[ERROR] Cannot connect as a client to the locator.");
+            System.exit(0);
+        }
+    }
+
+    /**
+     * Handles the receiving of a {@code LeaderDiscoveryResponse} message.
+     * @param message Message received.
+     * @param sender Sender of the message (the locator should be the sender of the message).
+     */
+    private void onLeaderDiscoveryResponse (LeaderDiscoveryResponse message, String sender) {
+        if (message.absenceOfLeader()) {
+            final int waitingSeconds = 20;
+            System.out.println("[INFO] No available leader now: retrying in " + waitingSeconds + " seconds...");
+            ScheduledExecutorService retrySendingMessage = Executors.newSingleThreadScheduledExecutor();
+            retrySendingMessage.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()), waitingSeconds, TimeUnit.SECONDS);
+        } else {
+            System.out.println("[INFO] Setting available leader: " + message.getLeaderReference().nodeName());
+            clientNetwork.connectToBrokerLeader(message.getLeaderReference());
         }
     }
 

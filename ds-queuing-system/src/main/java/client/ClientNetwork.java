@@ -1,6 +1,8 @@
 package client;
 
 import messages.Message;
+import misc.NodeReference;
+import java.io.IOException;
 
 /**
  * This class acts as an interface between the communication layer and the {@code ClientController}.
@@ -8,6 +10,7 @@ import messages.Message;
 public class ClientNetwork {
     private final ClientController clientController;
     private LocatorSocket socketToLocator;
+    private BrokerNetSocket brokerNetSocket;
 
     /**
      * Create the instance of {@code ClientNetwork} and tries to connect to the locator.
@@ -18,6 +21,24 @@ public class ClientNetwork {
     public ClientNetwork (ClientController clientController, String locatorIPAddress, int locatorPort) {
         this.clientController = clientController;
         socketToLocator = new LocatorSocket(this, locatorIPAddress, locatorPort);
+    }
+
+    /**
+     * Connect to the leader with the {@code NodeReference} defined as in the parameter.
+     * If the client was already connected to a leader, flush and reset the previous connection.
+     * @param leaderReference Reference of the broker's leader.
+     */
+    public void connectToBrokerLeader (NodeReference leaderReference) {
+        if (leaderReference.isBroker()) {
+            flushLeaderConnection();
+            try {
+                this.brokerNetSocket = new BrokerNetSocket(leaderReference.nodeName(),
+                        leaderReference.ipAddress(), leaderReference.publicPort(), this);
+                System.out.println("[INFO] Connected to the leader: " + leaderReference.nodeName() + ".");
+            } catch (IOException e) {
+                System.out.println("[EXCEPTION] Cannot connect to the leader " + leaderReference.nodeName() + ": " + e.getMessage());
+            }
+        }
     }
 
     /**
@@ -37,6 +58,8 @@ public class ClientNetwork {
     public void sendMessage(String receiver, Message message) {
         if (receiver.equalsIgnoreCase("locator")) {
             socketToLocator.sendMessage(message);
+        } else if (receiver.equalsIgnoreCase("leader")) {
+            brokerNetSocket.sendMessage(message);
         }
     }
 
@@ -47,5 +70,14 @@ public class ClientNetwork {
      */
     public void onMessageReceived(Message message, String sender) {
         clientController.update(message, sender);
+    }
+
+    /**
+     * Reset the connection to the broker's leader, i.e., if an event occurred such as the leader changed.
+     */
+    private void flushLeaderConnection () {
+        if (brokerNetSocket != null) {
+            brokerNetSocket = null;
+        }
     }
 }

@@ -25,6 +25,7 @@ public class OtherBrokerSocket {
 
     /**
      * Create the {@code OtherBrokerSocket} as a connection from the broker to another broker.
+     * @param name Name of the other broker.
      * @param ipAddress IP address of the other broker.
      * @param port Public port on which the other broker keeps listening for new connections.
      * @param brokerNetworkRef Reference to the actual {@code BrokerNetwork}.
