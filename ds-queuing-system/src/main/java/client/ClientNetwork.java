@@ -10,7 +10,7 @@ import java.io.IOException;
 public class ClientNetwork {
     private final ClientController clientController;
     private LocatorSocket socketToLocator;
-    private BrokerNetSocket brokerNetSocket;
+    private LeaderSocket leaderSocket;
 
     /**
      * Create the instance of {@code ClientNetwork} and tries to connect to the locator.
@@ -32,7 +32,7 @@ public class ClientNetwork {
         if (leaderReference.isBroker()) {
             flushLeaderConnection();
             try {
-                this.brokerNetSocket = new BrokerNetSocket(leaderReference.nodeName(),
+                this.leaderSocket = new LeaderSocket(leaderReference.nodeName(),
                         leaderReference.ipAddress(), leaderReference.publicPort(), this);
                 System.out.println("[INFO] Connected to the leader: " + leaderReference.nodeName() + ".");
             } catch (IOException e) {
@@ -59,7 +59,7 @@ public class ClientNetwork {
         if (receiver.equalsIgnoreCase("locator")) {
             socketToLocator.sendMessage(message);
         } else if (receiver.equalsIgnoreCase("leader")) {
-            brokerNetSocket.sendMessage(message);
+            leaderSocket.sendMessage(message);
         }
     }
 
@@ -73,11 +73,22 @@ public class ClientNetwork {
     }
 
     /**
-     * Reset the connection to the broker's leader, i.e., if an event occurred such as the leader changed.
+     * Reset the connection to the broker's leader by voiding the attribute {@code LeaderSocket}.
      */
     private void flushLeaderConnection () {
-        if (brokerNetSocket != null) {
-            brokerNetSocket = null;
+        if (leaderSocket != null) {
+            leaderSocket = null;
         }
+    }
+
+    /**
+     * Inform the client about the disconnection of the broker and remove the current instance of {@code LeaderSocket}.
+     * Then call the {@code ClientController} to start asking the locator for the new leader.
+     * @param leaderSocket The current instance of {@code LeaderSocket}.
+     */
+    public void onLeaderDisconnection(LeaderSocket leaderSocket) {
+        System.out.println("[INFO] Leader " + leaderSocket.getLeaderName() + " disconnected.");
+        flushLeaderConnection();
+        clientController.onLeaderDisconnection();
     }
 }

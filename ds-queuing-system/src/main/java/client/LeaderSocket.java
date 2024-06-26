@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
  * This class handles all the logic behind the connection to the broker's leader.
  * The client acts as a "client" for the broker leader.
  */
-public class BrokerNetSocket {
+public class LeaderSocket {
     // Application attributes
     private final String leaderName;
     private final ExecutorService readFromLeaderService = Executors.newSingleThreadExecutor();
@@ -30,7 +30,7 @@ public class BrokerNetSocket {
      * @param port Public port on which the broker's leader is listening for new connections.
      * @param clientNetwork Reference to the {@code ClientNetwork} of this client.
      */
-    public BrokerNetSocket (String leaderName, String ipAddress, int port, ClientNetwork clientNetwork) throws IOException {
+    public LeaderSocket(String leaderName, String ipAddress, int port, ClientNetwork clientNetwork) throws IOException {
         this.leaderName = leaderName;
         this.clientNetwork = clientNetwork;
 
@@ -73,13 +73,14 @@ public class BrokerNetSocket {
     }
 
     /**
-     * Disconnect the broker from the other broker, closing the socket and stopping the reading service.
+     * Disconnect the client from the current broker's leader, by closing the {@code Socket} and stopping the
+     * reading process; then pass the control to the {@code ClientNetwork}.
      */
     public void disconnect () {
         if (!readFromLeaderService.isShutdown()) readFromLeaderService.shutdownNow();
         try {
             if (!socket.isClosed()) socket.close();
-            // TODO: clientNetwork.onNodeServerDisconnection(this);
+            clientNetwork.onLeaderDisconnection(this);
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to disconnect from " + leaderName + ": " + e.getMessage());
         }

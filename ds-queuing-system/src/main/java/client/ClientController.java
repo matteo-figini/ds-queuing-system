@@ -170,4 +170,11 @@ public class ClientController {
         System.out.println(readQueueRequest);
         clientNetwork.sendMessage("leader", readQueueRequest);
     }
+
+    /**
+     * When the leader is disconnected, the client starts asking the locator for who is the new leader.
+     */
+    public void onLeaderDisconnection() {
+        clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest());
+    }
 }
