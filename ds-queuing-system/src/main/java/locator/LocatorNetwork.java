@@ -64,12 +64,7 @@ public class LocatorNetwork implements Runnable {
      * @param sender The {@code NodeHandler} representing the sender of the message.
      */
     public void onMessageReceived (Message message, NodeHandler sender) {
-        if (message.type == MessageType.HELLO_REQUEST) {
-            HelloRequestMessage helloMessage = (HelloRequestMessage) message;
-            locatorController.addNode(helloMessage, sender);
-        } else {
-            locatorController.onMessageReceived(message, sender);
-        }
+        locatorController.onMessageReceived(message, sender);
     }
 
     /**

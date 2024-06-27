@@ -49,51 +49,34 @@ public class LocatorController {
      */
     public void onMessageReceived (Message message, NodeHandler senderReference) {
         switch (Objects.requireNonNull(message.type)) {
-            case NET_DISCOVERY_REQUEST -> {
-                List<NodeReference> brokersConnected = getConnectedBrokers();
-                senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected));
-            }
-            case LEADER_DISCOVERY_REQUEST -> {
-                // The sender (a client) is asking for the details of the leader.
-                LeaderDiscoveryResponse response;
-                // DEBUG
-                this.leader = nodesConnected.get(0);
-                // END DEBUG
-                if (this.leader == null) {
-                    response = new LeaderDiscoveryResponse(true, null);
-                } else {
-                    response = new LeaderDiscoveryResponse(false, this.leader);
-                }
-                senderReference.sendMessage(response);
-            }
-            default -> {
-                System.out.println("[ERROR] Message type " + message.type + " not supported.");
-            }
+            case HELLO_REQUEST -> onHelloRequestMessage((HelloRequestMessage) message, senderReference);
+            case NET_DISCOVERY_REQUEST -> onNetDiscoveryRequest((NetDiscoveryRequestMessage) message, senderReference);
+            case LEADER_DISCOVERY_REQUEST -> onLeaderDiscoveryRequest((LeaderDiscoveryRequest) message, senderReference);
+            default -> System.out.println("[ERROR] Message type " + message.type + " not supported.");
         }
     }
 
-    /* ---------- APPLICATION METHODS ---------- */
     /**
      * Add a new node connected to the locator. If the node is a broker and the maximum number of brokers is already
      * reached, deny the connection; otherwise, add the new connected node (either a broker or a client) and the
      * corresponding reference to the locator.
      * @param message The {@code HelloRequestMessage} containing presentation info of the node. Here it is assumed that
      *                the name of the node is unique (i.e., no explicit check for simplicity).
-     * @param nodeHandler The {@code NodeHandler} representing the reference to the connected node.
+     * @param senderReference The {@code NodeHandler} representing the reference to the connected node.
      */
-    public void addNode (HelloRequestMessage message, NodeHandler nodeHandler) {
+    public void onHelloRequestMessage (HelloRequestMessage message, NodeHandler senderReference) {
         ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
-        nodeHandler.setNodeName(message.getNodeName());
-        System.out.println("[INFO] Set node name: " + nodeHandler.getNodeName());
+        senderReference.setNodeName(message.getNodeName());
+        System.out.println("[INFO] Set node name: " + senderReference.getNodeName());
         if (message.isBroker() && brokersConnected >= maximumBrokerNumber) {
             System.out.println("[ERROR] Number of maximum brokers already reached: unable to connect " + message.getNodeName());
-            nodeHandler.sendMessage(new HelloResponseMessage(false));
+            senderReference.sendMessage(new HelloResponseMessage(false));
         } else {
             // When a node connects to the locator:
             // - Set the name of the connected node
             // - Add the corresponding NodeHandler to the map associating the name to the NodeHandler;
             // - Create a NodeReference and add it to the list.
-            nodeHandlers.put(nodeHandler.getNodeName(), nodeHandler);
+            nodeHandlers.put(senderReference.getNodeName(), senderReference);
             if (message.isBroker()) brokersConnected++;
             NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(),
                     message.getNodePublicPort(),
@@ -104,20 +87,48 @@ public class LocatorController {
                     "[INFO] Added new broker: " + nodeReference :
                     "[INFO] Added new client: " + nodeReference);
             System.out.println(nodesConnected);
-            nodeHandler.sendMessage(new HelloResponseMessage(true));
-
-            // If all the required brokers are connected, send a message to all the brokers.
-            // A small delay is set to allow all the residual messages to be properly exchanged.
-            // TODO: move away from here --> where?
-            if (networkState == NetworkState.CONNECTING_BROKERS && brokersConnected == maximumBrokerNumber) {
-                this.networkState = NetworkState.NETWORK_CONNECTED;
-                startRunning.schedule(() -> {
-                    nodesConnected.stream().filter(NodeReference::isBroker).map(node ->
-                            nodeHandlers.get(node.nodeName())).filter(Objects::nonNull).forEach(handler ->
-                                handler.sendMessage(new BrokersReadyMessage()));
-                }, 1000, TimeUnit.MILLISECONDS);
-            }
+            senderReference.sendMessage(new HelloResponseMessage(true));
         }
+    }
+
+    /**
+     * Handle a message of type {@code NetDiscoveryRequestMessage}.
+     * @param message The message received.
+     * @param senderReference Reference of the sender.
+     */
+    public void onNetDiscoveryRequest (NetDiscoveryRequestMessage message, NodeHandler senderReference) {
+        List<NodeReference> brokersConnected = getConnectedBrokers();
+        senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected));
+
+        // If all the required brokers are connected, send a message to all the brokers.
+        // A small delay is set to allow all the residual messages to be properly exchanged.
+        if (networkState == NetworkState.CONNECTING_BROKERS && this.brokersConnected == maximumBrokerNumber) {
+            this.networkState = NetworkState.NETWORK_CONNECTED;
+            ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
+            startRunning.schedule(() -> {
+                nodesConnected.stream().filter(NodeReference::isBroker).map(node ->
+                        nodeHandlers.get(node.nodeName())).filter(Objects::nonNull).forEach(handler ->
+                        handler.sendMessage(new BrokersReadyMessage()));
+            }, 500, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /**
+     * Handle a message of type {@code LeaderDiscoveryRequest}.
+     * @param message The message received.
+     * @param senderReference Reference of the sender.
+     */
+    public void onLeaderDiscoveryRequest (LeaderDiscoveryRequest message, NodeHandler senderReference) {
+        // The sender (a client) is asking for the details of the leader.
+        LeaderDiscoveryResponse response;
+        // DEBUG
+        // this.leader = nodesConnected.get(0);
+        // END DEBUG
+        if (this.leader == null)
+            response = new LeaderDiscoveryResponse(true, null);
+        else
+            response = new LeaderDiscoveryResponse(false, this.leader);
+        senderReference.sendMessage(response);
     }
 
     /* ---------- UTILITY METHODS ---------- */
