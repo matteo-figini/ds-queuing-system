@@ -56,6 +56,9 @@ public class LocatorController {
             case LEADER_DISCOVERY_REQUEST -> {
                 // The sender (a client) is asking for the details of the leader.
                 LeaderDiscoveryResponse response;
+                // DEBUG
+                this.leader = nodesConnected.get(0);
+                // END DEBUG
                 if (this.leader == null) {
                     response = new LeaderDiscoveryResponse(true, null);
                 } else {

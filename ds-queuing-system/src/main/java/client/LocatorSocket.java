@@ -25,7 +25,7 @@ public class LocatorSocket {
      * Create the {@code LocatorSocket} object for the connection from the client to the locator.
      * @param clientNetwork Reference to the {@code ClientNetwork}.
      * @param locatorIP IP address of the locator.
-     * @param locatorPort Port on which the locator keeps listening for new connections.
+     * @param locatorPort Port, on which the locator keeps listening for new connections.
      */
     public LocatorSocket(ClientNetwork clientNetwork, String locatorIP, int locatorPort) {
         this.clientNetwork = clientNetwork;
