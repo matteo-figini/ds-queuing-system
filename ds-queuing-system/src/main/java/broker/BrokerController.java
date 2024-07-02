@@ -1,11 +1,8 @@
 package broker;
 
+import messages.network.*;
 import misc.NodeReference;
 import messages.Message;
-import messages.network.HelloRequestMessage;
-import messages.network.HelloResponseMessage;
-import messages.network.NetDiscoveryRequestMessage;
-import messages.network.NetDiscoveryResponseMessage;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
@@ -22,6 +19,7 @@ public class BrokerController {
     // This structure keeps a reference to every other node (broker or client) connected to the broker, identified
     // by their name.
     private final HashMap<String, NodeReference> nodesConnected = new HashMap<>();
+    private String leaderBroker;
 
     /**
      * Create the {@code BrokerController} instance.
@@ -29,6 +27,7 @@ public class BrokerController {
      */
     public BrokerController (String brokerName) {
         this.brokerName = brokerName;
+        this.leaderBroker = null;
     }
 
     /**
@@ -66,37 +65,58 @@ public class BrokerController {
     public void update (Message message, String sender) {
         if (message != null) {
             switch (message.type) {
-                case HELLO_RESPONSE -> {
-                    HelloResponseMessage helloResponseMessage = (HelloResponseMessage) message;
-                    if (helloResponseMessage.isConnectionAccepted()) {
-                        brokerNetwork.sendMessage("locator", new NetDiscoveryRequestMessage());
-                    } else {
-                        System.out.println("[ERROR] Cannot connect as a broker to the locator, maybe the " +
-                                "maximum number of allowed brokers is already reached.");
-                        System.exit(0);
-                    }
-                }
-                case NET_DISCOVERY_RESPONSE -> {
-                    NetDiscoveryResponseMessage netDiscoveryResponseMessage = (NetDiscoveryResponseMessage) message;
-                    for (NodeReference nodeReference : netDiscoveryResponseMessage.getBrokersConnected()) {
-                        if (!nodeReference.nodeName().equals(brokerName)) {
-                            nodesConnected.put(nodeReference.nodeName(), nodeReference);
-                        }
-                    }
-                    connectToOtherBrokers();
-                    System.out.println("[INFO] Connected to " + nodesConnected.size() + " brokers.");
-                    System.out.println(nodesConnected);
-                }
-                case BROKERS_READY_MESSAGE -> {
-                    System.out.println("[INFO] Network ready to start: " + nodesConnected);
-                }
+                case HELLO_RESPONSE -> onHelloResponseMessage((HelloResponseMessage) message);
+                case NET_DISCOVERY_RESPONSE -> onNetDiscoveryResponseMessage((NetDiscoveryResponseMessage) message);
+                case BROKERS_READY_MESSAGE -> onBrokersReadyMessage((BrokersReadyMessage) message);
                 default -> System.out.println("[ERROR] Unknown message type " + message.type);
             }
         }
     }
 
-    public void handleDisconnection (String disconnectedNode) {
+    /**
+     * Handle a message of type {@code HelloResponseMessage}.
+     * @param message Message received.
+     */
+    private void onHelloResponseMessage (HelloResponseMessage message) {
+        if (message.isConnectionAccepted()) {
+            brokerNetwork.sendMessage("locator", new NetDiscoveryRequestMessage());
+        } else {
+            System.out.println("[ERROR] Cannot connect as a broker to the locator.");
+            System.exit(0);
+        }
+    }
 
+    /**
+     * Handle a message of type {@code NetDiscoveryResponseMessage}.
+     * @param message Message received.
+     */
+    private void onNetDiscoveryResponseMessage (NetDiscoveryResponseMessage message) {
+        message.getBrokersConnected().stream().filter(nodeReference -> !nodeReference.nodeName().equals(brokerName))
+                .forEach(nodeReference -> nodesConnected.put(nodeReference.nodeName(), nodeReference));
+        connectToOtherBrokers();
+        System.out.println("[INFO] Connected to " + nodesConnected.size() + " brokers.");
+        System.out.println(nodesConnected);
+    }
+
+    /**
+     * Handle a message of type {@code BrokersReadyMessage}.
+     * @param message Message received.
+     */
+    private void onBrokersReadyMessage (BrokersReadyMessage message) {
+        System.out.println("[INFO] Network ready to start: " + nodesConnected);
+        // TODO: is it possible to start a countdown for running an election?
+    }
+
+    /**
+     * Handle the disconnection of the code. If the disconnected node was the broker's leader, remove the reference.
+     * @param disconnectedNode Name of the disconnected node.
+     */
+    public void handleDisconnection (String disconnectedNode) {
+        if (this.leaderBroker != null && this.leaderBroker.equals(disconnectedNode)) {
+            this.leaderBroker = null;
+            System.out.println("[INFO] Leader broker disconnected.");
+            // TODO: is it possible to start a countdown now for running an election?
+        }
     }
 
     /**
@@ -114,20 +134,18 @@ public class BrokerController {
      * Connect to the other brokers already connected in the network, listed in the {@code nodesConnected} list.
      */
     private void connectToOtherBrokers() {
-        for (NodeReference nodeReference : nodesConnected.values()) {
-            if (nodeReference.isBroker()) {
-                brokerNetwork.connectToOtherBroker(nodeReference);
-                try {
-                    brokerNetwork.sendMessage(nodeReference.nodeName(), new HelloRequestMessage (
-                            Inet4Address.getLocalHost().getHostAddress(),
-                            brokerNetwork.getBrokerPublicPort(),
-                            brokerName,
-                            true
-                    ));
-                } catch (UnknownHostException e) {
-                    System.out.println("[EXCEPTION] " + e.getMessage());
-                }
+        nodesConnected.values().stream().filter(NodeReference::isBroker).forEach(nodeReference -> {
+            brokerNetwork.connectToOtherBroker(nodeReference);
+            try {
+                brokerNetwork.sendMessage(nodeReference.nodeName(), new HelloRequestMessage(
+                        Inet4Address.getLocalHost().getHostAddress(),
+                        brokerNetwork.getBrokerPublicPort(),
+                        brokerName,
+                        true
+                ));
+            } catch (UnknownHostException e) {
+                System.out.println("[EXCEPTION] " + e.getMessage());
             }
-        }
+        });
     }
 }

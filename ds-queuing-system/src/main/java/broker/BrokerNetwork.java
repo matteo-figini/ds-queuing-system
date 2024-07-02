@@ -172,7 +172,7 @@ public class BrokerNetwork {
         // Remove the node if it is a client.
         if (clientsClientHandlers.containsValue(otherNodeClientHandler))
             clientsClientHandlers.remove(otherNodeClientHandler.getOtherNodeName());
-        System.out.println("[DISCONNECT] \"Client\" node with name \"" + otherNodeClientHandler.getOtherNodeName() + "\" disconnected.");
+        System.out.println("[DISCONNECT] Node with name \"" + otherNodeClientHandler.getOtherNodeName() + "\" disconnected.");
         // Pass the control to the broker controller
         brokerController.handleDisconnection(otherNodeClientHandler.getOtherNodeName());
     }
@@ -185,7 +185,7 @@ public class BrokerNetwork {
     public void onNodeServerDisconnection (OtherBrokerSocket otherBrokerSocket) {
         if (otherBrokersSockets.containsValue(otherBrokerSocket))
             otherBrokersSockets.remove(otherBrokerSocket.getOtherBrokerName());
-        System.out.println("[DISCONNECT] \"Server\" node with name \"" + otherBrokerSocket.getOtherBrokerName() + "\" disconnected.");
+        System.out.println("[DISCONNECT] Node with name \"" + otherBrokerSocket.getOtherBrokerName() + "\" disconnected.");
         brokerController.handleDisconnection(otherBrokerSocket.getOtherBrokerName());
     }
 }
