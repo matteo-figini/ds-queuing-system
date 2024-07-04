@@ -1,17 +1,12 @@
 package broker;
 
 import messages.network.*;
-import misc.AddressHandler;
 import misc.NodeReference;
 import messages.Message;
 
 import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.net.UnknownHostException;
-import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.Scanner;
 
 /**
  * This class represents the main element of a broker, managing all the underlying logic
@@ -38,38 +33,10 @@ public class BrokerController {
     /**
      * Send a {@code HelloRequestMessage} to the locator.
      */
-    public void startCommunicationGreetings () {
-        String localIPAddress = retrieveIPAddress();
-        /*try {
-            localIPAddress = Inet4Address.getLocalHost().getHostAddress();
-            // localIPAddress = AddressHandler.retrieveCorrectIPAddress();
-        } catch (UnknownHostException e) {
-            localIPAddress = "127.0.0.1";
-            System.out.println("[EXCEPTION] Unable to retrieve the local IP address: " + e.getMessage());
-            System.out.println("[EXCEPTION] Adding the default address: " + localIPAddress);
-        }*/
+    public void startCommunicationGreetings (String localIPAddress) {
         int publicPort = brokerNetwork.getBrokerPublicPort();
         HelloRequestMessage helloMessage = new HelloRequestMessage(localIPAddress, publicPort, brokerName, true);
         brokerNetwork.sendMessage("locator", helloMessage);
-    }
-
-    private String retrieveIPAddress () {
-        String localIPAddress;
-        try {
-            localIPAddress = Inet4Address.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-            localIPAddress = "127.0.0.1";
-        }
-        System.out.println("[INFO] Proposed local IP Address: " + localIPAddress);
-        System.out.println("[INFO] Insert another IP address (or press ENTER to confirm " + localIPAddress + "): ");
-
-        Scanner scanner = new Scanner(System.in);
-        String alternativeIPAddress = scanner.nextLine();
-        if (!alternativeIPAddress.equalsIgnoreCase("")) {
-            localIPAddress = alternativeIPAddress;
-        }
-
-        return localIPAddress;
     }
 
     /**

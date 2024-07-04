@@ -6,7 +6,6 @@ import messages.Message;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Scanner;
 
 /**
  * This class handles the aspects related to the network interface of a single broker.
@@ -35,10 +34,10 @@ public class BrokerNetwork {
      * @param locatorIPAddress IP address of the remote locator.
      * @param locatorPort Port, on which the locator is listening for new connections.
      */
-    public BrokerNetwork (BrokerController controller, String locatorIPAddress, int locatorPort) {
+    public BrokerNetwork (BrokerController controller, String locatorIPAddress, int locatorPort, int publicPort) {
         this.brokerController = controller;
         socketToLocator = new LocatorSocket(this, locatorIPAddress, locatorPort);
-        startBrokerServerSocket();
+        startBrokerServerSocket(publicPort);
     }
 
     /**
@@ -52,9 +51,7 @@ public class BrokerNetwork {
      * Ask the user the public port on which the broker's server socket will run and instantiate the
      * {@code BrokerServerSocket}.
      */
-    private void startBrokerServerSocket() {
-        System.out.print("Insert the public port on which the broker will listen to new connections: ");
-        int publicPort = Integer.parseInt(new Scanner(System.in).nextLine());
+    private void startBrokerServerSocket (int publicPort) {
         this.brokerServerSocket = new BrokerServerSocket(publicPort, this);
         Thread thread = new Thread(brokerServerSocket);
         thread.start();
