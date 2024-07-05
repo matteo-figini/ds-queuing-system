@@ -103,7 +103,7 @@ public class BrokerController {
         // TODO: is it possible to start a countdown now for running an election?
 
         // DEBUG: fake the creation of the leader
-        if (this.brokerName.equals("b1")) {
+        /* if (this.brokerName.equals("b1")) {
             ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
             executor.schedule(() -> {
                 try {
@@ -117,7 +117,7 @@ public class BrokerController {
                     throw new RuntimeException(e);
                 }
             }, 500, TimeUnit.MILLISECONDS);
-        }
+        }*/
         // END DEBUG
     }
 

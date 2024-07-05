@@ -17,7 +17,6 @@ import java.util.stream.Collectors;
  */
 public class LocatorController {
     private LocatorNetwork locatorNetworkRef;
-    private final Map<String, NodeHandler> nodeHandlers = new HashMap<>();
     private final List<NodeReference> nodesConnected = new ArrayList<>();
     private int brokersConnected = 0;
     private final int maximumBrokerNumber;
@@ -78,7 +77,7 @@ public class LocatorController {
             // - Set the name of the connected node
             // - Add the corresponding NodeHandler to the map associating the name to the NodeHandler;
             // - Create a NodeReference and add it to the list.
-            nodeHandlers.put(senderReference.getNodeName(), senderReference);
+            locatorNetworkRef.addNodeHandler(senderReference.getNodeName(), senderReference);
             if (message.isBroker()) brokersConnected++;
             NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(),
                     message.getNodePublicPort(),
@@ -101,7 +100,6 @@ public class LocatorController {
     public void onNetDiscoveryRequest (NetDiscoveryRequestMessage message, NodeHandler senderReference) {
         List<NodeReference> brokersConnected = getConnectedBrokers();
         senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected));
-
         // If all the required brokers are connected, send a message to all the brokers.
         // A small delay is set to allow all the residual messages to be properly exchanged.
         if (networkState == NetworkState.CONNECTING_BROKERS && this.brokersConnected == maximumBrokerNumber) {
@@ -109,7 +107,7 @@ public class LocatorController {
             ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
             startRunning.schedule(() -> {
                 nodesConnected.stream().filter(NodeReference::isBroker)
-                        .forEach(nodeReference -> sendMessage(new BrokersReadyMessage(), nodeReference.nodeName()));
+                        .forEach(nodeReference -> locatorNetworkRef.sendMessage(new BrokersReadyMessage(), nodeReference.nodeName()));
             }, 500, TimeUnit.MILLISECONDS);
         }
     }
@@ -141,25 +139,10 @@ public class LocatorController {
         // If the node is a client, send the message to them.
         LeaderDiscoveryResponse leaderDiscoveryResponse = new LeaderDiscoveryResponse(false, this.leader);
         nodesConnected.stream().filter(nodeReference -> !nodeReference.isBroker())
-                .forEach(nodeReference -> sendMessage(leaderDiscoveryResponse, nodeReference.nodeName()));
+                .forEach(nodeReference -> locatorNetworkRef.sendMessage(leaderDiscoveryResponse, nodeReference.nodeName()));
     }
 
     /* ---------- UTILITY METHODS ---------- */
-    /**
-     * Send the message to the receiver specified by name. If the message cannot be sent, an error is reported in output.
-     * @param message Message to be sent.
-     * @param receiverName Name of the receiver node.
-     */
-    public void sendMessage (Message message, String receiverName) {
-        NodeHandler receiverNode = nodeHandlers.get(receiverName);
-        if (receiverNode != null) {
-            receiverNode.sendMessage(message);
-        } else {
-            System.err.println("[ERROR] Cannot send the message to " + receiverName);
-        }
-    }
-
-
     /**
      * @return The list of all the nodes, that are also brokers, actually connected to the locator.
      */
@@ -181,7 +164,6 @@ public class LocatorController {
         nodesConnected.stream().filter(node -> node.isBroker() && node.nodeName().equals(nodeHandler.getNodeName())).forEach(node -> brokersConnected--);
         // Remove the node from the list "nodesConnected" and from the hashmap "nodeHandlers".
         nodesConnected.removeIf(node -> node.nodeName().equals(nodeHandler.getNodeName()));
-        nodeHandlers.remove(nodeHandler.getNodeName());
         System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\" from the locator.");
         System.out.println("[INFO] Brokers connected: " + brokersConnected);
     }

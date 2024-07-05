@@ -1,11 +1,14 @@
 package locator;
 
 import messages.Message;
+import misc.NodeReference;
 
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This class handles all the network communication by the locator component.
@@ -15,6 +18,9 @@ public class LocatorNetwork implements Runnable {
     private final int port;
     private final LocatorController locatorController;
     private ServerSocket serverSocket;
+
+    // This HashMap contains a reference to all the nodes (brokers & clients) currently connected
+    private final Map<String, NodeHandler> nodeHandlers = new HashMap<>();
 
     /**
      * Set the default parameters needed for running the locator.
@@ -57,6 +63,29 @@ public class LocatorNetwork implements Runnable {
     }
 
     /**
+     * Insert the {@code NodeHandler} passed as parameter to the list of node handlers.
+     * @param nodeName Name of the new connected node.
+     * @param nodeHandler {@code NodeHandler} of the new connected node.
+     */
+    public void addNodeHandler (String nodeName, NodeHandler nodeHandler) {
+        nodeHandlers.put(nodeName, nodeHandler);
+    }
+
+    /**
+     * Send the message to the receiver specified by name. If the message cannot be sent, an error is reported in output.
+     * @param message Message to be sent.
+     * @param receiverName Name of the receiver node.
+     */
+    public void sendMessage (Message message, String receiverName) {
+        NodeHandler receiverNode = nodeHandlers.get(receiverName);
+        if (receiverNode != null) {
+            receiverNode.sendMessage(message);
+        } else {
+            System.err.println("[ERROR] Cannot send the message to " + receiverName);
+        }
+    }
+
+    /**
      * Handles a generic message received from one of the connected nodes.
      * @param message The message received from the locator.
      * @param sender The {@code NodeHandler} representing the sender of the message.
@@ -66,10 +95,11 @@ public class LocatorNetwork implements Runnable {
     }
 
     /**
-     * Call the disconnection procedure on the {@code LocatorController}.
+     * Remove the reference to the disconnected node and pass all the disconnection procedure to the {@code LocatorController}.
      * @param nodeHandler The {@code NodeHandler} to be disconnected.
      */
     public void onClientDisconnection(NodeHandler nodeHandler) {
+        nodeHandlers.remove(nodeHandler.getNodeName());
         locatorController.disconnectNode(nodeHandler);
     }
 }
