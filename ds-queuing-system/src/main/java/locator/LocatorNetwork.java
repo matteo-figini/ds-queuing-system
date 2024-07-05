@@ -1,8 +1,6 @@
 package locator;
 
 import messages.Message;
-import messages.MessageType;
-import messages.network.HelloRequestMessage;
 
 import java.io.IOException;
 import java.net.Inet4Address;

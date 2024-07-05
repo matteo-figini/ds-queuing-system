@@ -1,0 +1,20 @@
+Entry point:
+1. Un follower, dopo aver ricevuto notizia della disconnessione del leader e dopo che il timeout è scaduto (per evitare
+   troppe elezioni contemporanee), diventa candidato e inizia la procedura di elezione.
+
+2. Un follower, dopo essere stato avviato e non aver ricevuto messaggi dal leader, diventa candidato e inizia la
+   procedura di elezione.
+   POSSIBILE PROBLEMA: se il follower si connette e il leader è già presente, è necessario un meccanismo che eviti al
+   follower di diventare candidato. Di norma Raft prevede un AppendEntries vuota, possiamo bypassare il problema
+   inviando un messaggio dal leader al nuovo follower che segnali chi è il leader.
+
+Processo:
+- Parte di Raft: ........... --> assumiamo che venga eletto un nuovo leader e gli altri follower ne siano a conoscenza.
+- Il nuovo leader informa il locator di essere il nuovo leader (tramite messaggio NewLeader).
+- Il locator propaga quest'informazione a tutti i client connessi con un messaggio specifico
+  (LeaderDiscoveryResponse dovrebbe andare bene allo scopo).
+- I client ricevono il messaggio LeaderDiscoveryResponse, aggiornano il riferimento al leader e tentano di connettersi
+  ad esso. Se il tentativo non funziona, riprovano entro un certo tempo (classica procedura del client).
+
+Exit point:
+- I client sono in grado di mandare messaggi al nuovo leader.

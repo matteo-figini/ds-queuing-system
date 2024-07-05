@@ -7,6 +7,10 @@ import messages.Message;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class represents the main element of a broker, managing all the underlying logic
@@ -97,6 +101,24 @@ public class BrokerController {
     private void onBrokersReadyMessage (BrokersReadyMessage message) {
         System.out.println("[INFO] Network ready to start: " + nodesConnected);
         // TODO: is it possible to start a countdown now for running an election?
+
+        // DEBUG: fake the creation of the leader
+        if (this.brokerName.equals("b1")) {
+            ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+            executor.schedule(() -> {
+                try {
+                    brokerNetwork.sendMessage("locator", new NewElectedLeader(new NodeReference(
+                            Inet4Address.getLocalHost().getHostAddress(),
+                            brokerNetwork.getBrokerPublicPort(),
+                            this.brokerName,
+                            true
+                    )));
+                } catch (UnknownHostException e) {
+                    throw new RuntimeException(e);
+                }
+            }, 500, TimeUnit.MILLISECONDS);
+        }
+        // END DEBUG
     }
 
     /**

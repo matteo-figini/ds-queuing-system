@@ -9,6 +9,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * This class represents the controller of the locator. It stores the set of brokers and clients
@@ -52,6 +53,7 @@ public class LocatorController {
             case HELLO_REQUEST -> onHelloRequestMessage((HelloRequestMessage) message, senderReference);
             case NET_DISCOVERY_REQUEST -> onNetDiscoveryRequest((NetDiscoveryRequestMessage) message, senderReference);
             case LEADER_DISCOVERY_REQUEST -> onLeaderDiscoveryRequest((LeaderDiscoveryRequest) message, senderReference);
+            case NEW_LEADER -> onNewElectedLeader((NewElectedLeader) message, senderReference);
             default -> System.out.println("[ERROR] Message type " + message.type + " not supported.");
         }
     }
@@ -106,9 +108,8 @@ public class LocatorController {
             this.networkState = NetworkState.NETWORK_CONNECTED;
             ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
             startRunning.schedule(() -> {
-                nodesConnected.stream().filter(NodeReference::isBroker).map(node ->
-                        nodeHandlers.get(node.nodeName())).filter(Objects::nonNull).forEach(handler ->
-                        handler.sendMessage(new BrokersReadyMessage()));
+                nodesConnected.stream().filter(NodeReference::isBroker)
+                        .forEach(nodeReference -> sendMessage(new BrokersReadyMessage(), nodeReference.nodeName()));
             }, 500, TimeUnit.MILLISECONDS);
         }
     }
@@ -121,9 +122,6 @@ public class LocatorController {
     public void onLeaderDiscoveryRequest (LeaderDiscoveryRequest message, NodeHandler senderReference) {
         // The sender (a client) is asking for the details of the leader.
         LeaderDiscoveryResponse response;
-        // DEBUG
-        // this.leader = nodesConnected.get(0);
-        // END DEBUG
         if (this.leader == null)
             response = new LeaderDiscoveryResponse(true, null);
         else
@@ -131,18 +129,43 @@ public class LocatorController {
         senderReference.sendMessage(response);
     }
 
+    /**
+     * Handle a message of type {@code NewElectedLeader} by setting the reference of the new leader and
+     * sending a message of type {@code LeaderDiscoveryResponse} to all the clients currently connected.
+     * @param message {@code NewElectedLeader} message received.
+     * @param senderReference Reference to the sender.
+     */
+    private void onNewElectedLeader (NewElectedLeader message, NodeHandler senderReference) {
+        setLeaderBroker(message.getLeaderReference().nodeName());
+        System.out.println("[INFO] Set new elected leader: " + this.leader.nodeName());
+        // If the node is a client, send the message to them.
+        LeaderDiscoveryResponse leaderDiscoveryResponse = new LeaderDiscoveryResponse(false, this.leader);
+        nodesConnected.stream().filter(nodeReference -> !nodeReference.isBroker())
+                .forEach(nodeReference -> sendMessage(leaderDiscoveryResponse, nodeReference.nodeName()));
+    }
+
     /* ---------- UTILITY METHODS ---------- */
+    /**
+     * Send the message to the receiver specified by name. If the message cannot be sent, an error is reported in output.
+     * @param message Message to be sent.
+     * @param receiverName Name of the receiver node.
+     */
+    public void sendMessage (Message message, String receiverName) {
+        NodeHandler receiverNode = nodeHandlers.get(receiverName);
+        if (receiverNode != null) {
+            receiverNode.sendMessage(message);
+        } else {
+            System.err.println("[ERROR] Cannot send the message to " + receiverName);
+        }
+    }
+
+
     /**
      * @return The list of all the nodes, that are also brokers, actually connected to the locator.
      */
     private List<NodeReference> getConnectedBrokers () {
-        List<NodeReference> brokersConnected = new ArrayList<>();
-        for (NodeReference nodeReference : nodesConnected) {
-            if (nodeReference.isBroker()) {
-                brokersConnected.add(nodeReference);
-            }
-        }
-        return brokersConnected;
+        return nodesConnected.stream()
+                .filter(NodeReference::isBroker).collect(Collectors.toList());
     }
 
     /**
