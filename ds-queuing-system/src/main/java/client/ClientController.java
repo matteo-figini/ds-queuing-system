@@ -101,7 +101,7 @@ public class ClientController {
      */
     private void onLeaderDiscoveryResponse (LeaderDiscoveryResponse message, String sender) {
         if (message.absenceOfLeader()) {
-            final int waitingSeconds = 20;
+            final int waitingSeconds = 10;
             System.out.println("[INFO] No available leader now: retrying in " + waitingSeconds + " seconds...");
             ScheduledExecutorService retrySendingMessage = Executors.newSingleThreadScheduledExecutor();
             retrySendingMessage.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()), waitingSeconds, TimeUnit.SECONDS);
@@ -117,6 +117,7 @@ public class ClientController {
      */
     public void onLeaderDisconnection() {
         ScheduledExecutorService newLeaderRequest = Executors.newSingleThreadScheduledExecutor();
-        newLeaderRequest.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()), 1, TimeUnit.SECONDS);
+        newLeaderRequest.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()),
+                1, TimeUnit.SECONDS);
     }
 }

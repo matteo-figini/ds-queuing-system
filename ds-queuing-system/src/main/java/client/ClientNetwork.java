@@ -95,16 +95,12 @@ public class ClientNetwork {
     }
 
     /**
-     * Handles the disconnection of the locator by printing a message and stopping the execution of the broker in a fixed
-     * number of 5 seconds.
+     * Show a message about the disconnection of the locator.
+     * The locator is assumed to be reliable during all the execution of the system.
      * @param ipAddress IP address of the locator.
      * @param port Port, on which the locator is listening to.
      */
     public void onLocatorDisconnection(String ipAddress, int port) {
-        int secondsToShutdown = 5;
-        System.out.println("[DISCONNECT] Locator on " + ipAddress + ":" + port + " disconnected.");
-        System.out.println("[DISCONNECT] Closing the locator in " + secondsToShutdown + " seconds...");
-        ScheduledExecutorService stopRoutine = Executors.newSingleThreadScheduledExecutor();
-        stopRoutine.schedule(() -> System.exit(0), secondsToShutdown, TimeUnit.SECONDS);
+        System.out.println("[DISCONNECT] Locator on " + ipAddress + ":" + port +  " disconnected.");
     }
 }

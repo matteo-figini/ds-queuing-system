@@ -52,6 +52,11 @@ public class BrokerController {
         brokerNetwork.readMessagesFromLocator();
     }
 
+    /**
+     * Send a message to the corresponding receiver.
+     * @param receiver Name of the receiver.
+     * @param message {@code Message} to be sent.
+     */
     public void sendMessage (String receiver, Message message) {
         brokerNetwork.sendMessage(receiver, message);
     }

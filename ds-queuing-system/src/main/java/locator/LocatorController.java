@@ -166,6 +166,11 @@ public class LocatorController {
         nodesConnected.removeIf(node -> node.nodeName().equals(nodeHandler.getNodeName()));
         System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\" from the locator.");
         System.out.println("[INFO] Brokers connected: " + brokersConnected);
+        // If the node disconnected is the leader, remove the leader's reference
+        if (leader.nodeName().equals(nodeHandler.getNodeName())) {
+            System.out.println("[INFO] The disconnected node was the leader " + leader.nodeName());
+            leader = null;
+        }
     }
 
     /**
