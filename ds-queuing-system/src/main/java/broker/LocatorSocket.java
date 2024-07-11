@@ -81,9 +81,7 @@ public class LocatorSocket {
      */
     public void disconnect () {
         try {
-            if (!socketToLocator.isClosed()) {
-                socketToLocator.close();
-            }
+            if (!socketToLocator.isClosed()) socketToLocator.close();
             brokerNetwork.onLocatorDisconnection(String.valueOf(socketToLocator.getInetAddress()), socketToLocator.getPort());
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to close the connection to the locator properly.");

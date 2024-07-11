@@ -15,7 +15,7 @@ public enum MessageType
     LOG_REQUEST,
     /** Reply message to a log request, sent by a follower to the leader. */
     LOG_RESPONSE,
-    /** Election timeout event (the election process run out of time). */
+    /** Election timeout event (the election process runs out of time). */
     ELECTION_TIMEOUT,
     /** Leader heartbeat timeout event (followers haven't received an update from the leader). */
     LEADER_HEARTBEAT_TIMEOUT,

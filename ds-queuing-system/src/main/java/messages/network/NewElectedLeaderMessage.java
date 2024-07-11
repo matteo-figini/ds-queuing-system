@@ -8,14 +8,14 @@ import misc.NodeReference;
  * This message is sent from a broker to the locator, informing the locator that the broker's sender is the new elected
  * leader.
  */
-public class NewElectedLeader extends Message {
+public class NewElectedLeaderMessage extends Message {
     private final NodeReference leaderReference;
 
     /**
-     * Create the {@code NewElectedLeader} message.
+     * Create the {@code NewElectedLeaderMessage} message.
      * @param leaderReference {@code NodeReference} to the new leader.
      */
-    public NewElectedLeader(NodeReference leaderReference) {
+    public NewElectedLeaderMessage(NodeReference leaderReference) {
         super(MessageType.NEW_LEADER);
         this.leaderReference = leaderReference;
     }

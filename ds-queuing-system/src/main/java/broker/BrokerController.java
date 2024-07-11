@@ -9,7 +9,6 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -53,6 +52,10 @@ public class BrokerController {
         brokerNetwork.readMessagesFromLocator();
     }
 
+    public void sendMessage (String receiver, Message message) {
+        brokerNetwork.sendMessage(receiver, message);
+    }
+
     /**
      * Receives a message from the {@code BrokerNetwork} and process it, based on the message type.
      * If the message type is not supported, an error message will be printed on the screen.
@@ -75,7 +78,7 @@ public class BrokerController {
      */
     private void onHelloResponseMessage (HelloResponseMessage message) {
         if (message.isConnectionAccepted()) {
-            brokerNetwork.sendMessage("locator", new NetDiscoveryRequestMessage());
+            sendMessage("locator", new NetDiscoveryRequestMessage());
         } else {
             System.out.println("[ERROR] Cannot connect as a broker to the locator.");
             System.exit(0);
@@ -100,14 +103,14 @@ public class BrokerController {
      */
     private void onBrokersReadyMessage (BrokersReadyMessage message) {
         System.out.println("[INFO] Network ready to start: " + nodesConnected);
-        // TODO: is it possible to start a countdown now for running an election?
+        // TODO (to Raft): start a countdown for the leader election
 
         // DEBUG: fake the creation of the leader
-        /* if (this.brokerName.equals("b1")) {
+        if (this.brokerName.equals("b1")) {
             ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
             executor.schedule(() -> {
                 try {
-                    brokerNetwork.sendMessage("locator", new NewElectedLeader(new NodeReference(
+                    sendMessage("locator", new NewElectedLeaderMessage(new NodeReference(
                             Inet4Address.getLocalHost().getHostAddress(),
                             brokerNetwork.getBrokerPublicPort(),
                             this.brokerName,
@@ -116,8 +119,8 @@ public class BrokerController {
                 } catch (UnknownHostException e) {
                     throw new RuntimeException(e);
                 }
-            }, 500, TimeUnit.MILLISECONDS);
-        }*/
+            }, 1500, TimeUnit.MILLISECONDS);
+        }
         // END DEBUG
     }
 
@@ -129,7 +132,7 @@ public class BrokerController {
         if (this.leaderBroker != null && this.leaderBroker.equals(disconnectedNode)) {
             this.leaderBroker = null;
             System.out.println("[INFO] Leader broker disconnected.");
-            // TODO: is it possible to start a countdown now for running an election?
+            // TODO (to Raft): start a countdown for the leader election.
         }
     }
 
@@ -151,7 +154,7 @@ public class BrokerController {
         nodesConnected.values().stream().filter(NodeReference::isBroker).forEach(nodeReference -> {
             brokerNetwork.connectToOtherBroker(nodeReference);
             try {
-                brokerNetwork.sendMessage(nodeReference.nodeName(), new HelloRequestMessage(
+                sendMessage(nodeReference.nodeName(), new HelloRequestMessage(
                         Inet4Address.getLocalHost().getHostAddress(),
                         brokerNetwork.getBrokerPublicPort(),
                         brokerName,

@@ -113,8 +113,10 @@ public class ClientController {
 
     /**
      * When the leader is disconnected, the client starts asking the locator for who is the new leader.
+     * The request is postponed with a negligible delay to allow the locator to update and send stable information.
      */
     public void onLeaderDisconnection() {
-        clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest());
+        ScheduledExecutorService newLeaderRequest = Executors.newSingleThreadScheduledExecutor();
+        newLeaderRequest.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()), 1, TimeUnit.SECONDS);
     }
 }

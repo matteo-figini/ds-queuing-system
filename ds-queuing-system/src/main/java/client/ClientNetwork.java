@@ -3,6 +3,9 @@ package client;
 import messages.Message;
 import misc.NodeReference;
 import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class acts as an interface between the communication layer and the {@code ClientController}.
@@ -76,11 +79,10 @@ public class ClientNetwork {
      * Reset the connection to the broker's leader by voiding the attribute {@code LeaderSocket}.
      */
     private void flushLeaderConnection () {
-        if (leaderSocket != null) {
-            leaderSocket = null;
-        }
+        if (leaderSocket != null) leaderSocket = null;
     }
 
+    /* ---------- DISCONNECTION MANAGEMENT ---------- */
     /**
      * Inform the client about the disconnection of the broker and remove the current instance of {@code LeaderSocket}.
      * Then call the {@code ClientController} to start asking the locator for the new leader.
@@ -90,5 +92,19 @@ public class ClientNetwork {
         System.out.println("[INFO] Leader " + leaderSocket.getLeaderName() + " disconnected.");
         flushLeaderConnection();
         clientController.onLeaderDisconnection();
+    }
+
+    /**
+     * Handles the disconnection of the locator by printing a message and stopping the execution of the broker in a fixed
+     * number of 5 seconds.
+     * @param ipAddress IP address of the locator.
+     * @param port Port, on which the locator is listening to.
+     */
+    public void onLocatorDisconnection(String ipAddress, int port) {
+        int secondsToShutdown = 5;
+        System.out.println("[DISCONNECT] Locator on " + ipAddress + ":" + port + " disconnected.");
+        System.out.println("[DISCONNECT] Closing the locator in " + secondsToShutdown + " seconds...");
+        ScheduledExecutorService stopRoutine = Executors.newSingleThreadScheduledExecutor();
+        stopRoutine.schedule(() -> System.exit(0), secondsToShutdown, TimeUnit.SECONDS);
     }
 }

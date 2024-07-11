@@ -6,6 +6,9 @@ import messages.Message;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class handles the aspects related to the network interface of a single broker.
@@ -15,7 +18,7 @@ import java.util.HashMap;
  */
 public class BrokerNetwork {
     // Locator's connection
-    private final LocatorSocket socketToLocator;
+    private LocatorSocket socketToLocator;
 
     // Other connections on which the broker acts as a server (other brokers or clients)
     private BrokerServerSocket brokerServerSocket;
@@ -148,13 +151,17 @@ public class BrokerNetwork {
 
     /* ---------- DISCONNECTION MANAGEMENT ---------- */
     /**
-     * Handles the disconnection of the locator.
+     * Handles the disconnection of the locator by printing a message and stopping the execution of the broker in a fixed
+     * number of 5 seconds.
      * @param ipAddress IP address of the locator.
      * @param port Port, on which the locator is listening to.
      */
     public void onLocatorDisconnection (String ipAddress, int port) {
-        System.out.println("[INFO] Locator on " + ipAddress + ":" + port + " disconnected.");
-        // TODO: how to handle locator's disconnection?
+        int secondsToShutdown = 5;
+        System.out.println("[DISCONNECT] Locator on " + ipAddress + ":" + port + " disconnected.");
+        System.out.println("[DISCONNECT] Closing the locator in " + secondsToShutdown + " seconds...");
+        ScheduledExecutorService stopRoutine = Executors.newSingleThreadScheduledExecutor();
+        stopRoutine.schedule(() -> System.exit(0), secondsToShutdown, TimeUnit.SECONDS);
     }
 
     /**

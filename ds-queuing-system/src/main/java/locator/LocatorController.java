@@ -52,7 +52,7 @@ public class LocatorController {
             case HELLO_REQUEST -> onHelloRequestMessage((HelloRequestMessage) message, senderReference);
             case NET_DISCOVERY_REQUEST -> onNetDiscoveryRequest((NetDiscoveryRequestMessage) message, senderReference);
             case LEADER_DISCOVERY_REQUEST -> onLeaderDiscoveryRequest((LeaderDiscoveryRequest) message, senderReference);
-            case NEW_LEADER -> onNewElectedLeader((NewElectedLeader) message, senderReference);
+            case NEW_LEADER -> onNewElectedLeader((NewElectedLeaderMessage) message, senderReference);
             default -> System.out.println("[ERROR] Message type " + message.type + " not supported.");
         }
     }
@@ -128,12 +128,12 @@ public class LocatorController {
     }
 
     /**
-     * Handle a message of type {@code NewElectedLeader} by setting the reference of the new leader and
+     * Handle a message of type {@code NewElectedLeaderMessage} by setting the reference of the new leader and
      * sending a message of type {@code LeaderDiscoveryResponse} to all the clients currently connected.
-     * @param message {@code NewElectedLeader} message received.
+     * @param message {@code NewElectedLeaderMessage} message received.
      * @param senderReference Reference to the sender.
      */
-    private void onNewElectedLeader (NewElectedLeader message, NodeHandler senderReference) {
+    private void onNewElectedLeader (NewElectedLeaderMessage message, NodeHandler senderReference) {
         setLeaderBroker(message.getLeaderReference().nodeName());
         System.out.println("[INFO] Set new elected leader: " + this.leader.nodeName());
         // If the node is a client, send the message to them.
