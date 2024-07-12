@@ -35,7 +35,7 @@ public class ClientController {
      */
     public void setClientNetwork(ClientNetwork clientNetwork) {
         this.clientNetwork = clientNetwork;
-        this.commandInterpreter = new CommandInterpreter(this, this.clientNetwork);
+        this.commandInterpreter = new CommandInterpreter(this);
         clientNetwork.readMessagesFromLocator();
     }
 
@@ -62,6 +62,15 @@ public class ClientController {
         // Field "nodePublicPort" is not relevant
         HelloRequestMessage helloMessage = new HelloRequestMessage(localIPAddress, 0, clientName, false);
         clientNetwork.sendMessage("locator", helloMessage);
+    }
+
+    /**
+     * Send a message to the specified receiver.
+     * @param receiver Name of the receiver.
+     * @param message {@code Message} to be sent.
+     */
+    public void sendMessage (String receiver, Message message) {
+        clientNetwork.sendMessage(receiver, message);
     }
 
     /**

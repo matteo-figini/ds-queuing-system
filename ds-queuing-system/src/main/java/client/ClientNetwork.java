@@ -3,9 +3,6 @@ package client;
 import messages.Message;
 import misc.NodeReference;
 import java.io.IOException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class acts as an interface between the communication layer and the {@code ClientController}.

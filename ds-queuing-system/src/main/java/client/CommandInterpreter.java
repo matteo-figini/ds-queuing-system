@@ -14,16 +14,13 @@ import java.util.stream.IntStream;
  */
 public class CommandInterpreter {
     private final ClientController clientControllerRef;
-    private final ClientNetwork clientNetworkRef;
 
     /**
      * Creates the instance of {@code CommandInterpreter}.
      * @param clientControllerRef Reference to the current {@code ClientController}.
-     * @param clientNetworkRef Reference to the current {@code ClientNetwork}.
      */
-    public CommandInterpreter (ClientController clientControllerRef, ClientNetwork clientNetworkRef) {
+    public CommandInterpreter (ClientController clientControllerRef) {
         this.clientControllerRef = clientControllerRef;
-        this.clientNetworkRef = clientNetworkRef;
     }
 
     /**
@@ -52,7 +49,7 @@ public class CommandInterpreter {
         if (commandParts.length < 2) return;
         CreateQueueRequest createQueueRequest = new CreateQueueRequest(commandParts[1]);
         System.out.println(createQueueRequest);
-        clientNetworkRef.sendMessage("leader", createQueueRequest);
+        clientControllerRef.sendMessage("leader", createQueueRequest);
     }
 
     /**
@@ -66,7 +63,7 @@ public class CommandInterpreter {
         List<Integer> elementsToAppend = IntStream.range(2, commandParts.length).mapToObj(i -> Integer.parseInt(commandParts[i])).collect(Collectors.toList());
         AppendQueueRequest appendQueueRequest = new AppendQueueRequest(commandParts[1], elementsToAppend);
         System.out.println(appendQueueRequest);
-        clientNetworkRef.sendMessage("leader", appendQueueRequest);
+        clientControllerRef.sendMessage("leader", appendQueueRequest);
     }
 
     /**
@@ -79,6 +76,6 @@ public class CommandInterpreter {
         if (commandParts.length < 2) return;
         ReadQueueRequest readQueueRequest = new ReadQueueRequest(commandParts[1]);
         System.out.println(readQueueRequest);
-        clientNetworkRef.sendMessage("leader", readQueueRequest);
+        clientControllerRef.sendMessage("leader", readQueueRequest);
     }
 }
