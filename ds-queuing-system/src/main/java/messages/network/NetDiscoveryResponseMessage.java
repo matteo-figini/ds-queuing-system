@@ -1,5 +1,6 @@
 package messages.network;
 
+import misc.NetworkState;
 import misc.NodeReference;
 import messages.Message;
 import messages.MessageType;
@@ -16,13 +17,17 @@ public class NetDiscoveryResponseMessage extends Message {
     /** List of brokers actually connected to the locator. */
     private final List<NodeReference> brokersConnected;
 
+    private final NetworkState netState;
+
     /**
      * Create the {@code NetDiscoveryResponseMessage}.
      * @param brokersConnected List of brokers actually connected to the locator.
+     * @param networkState The current state of the network.
      */
-    public NetDiscoveryResponseMessage(List<NodeReference> brokersConnected) {
+    public NetDiscoveryResponseMessage(List<NodeReference> brokersConnected, NetworkState networkState) {
         super(MessageType.NET_DISCOVERY_RESPONSE);
         this.brokersConnected = new ArrayList<NodeReference>(brokersConnected);
+        this.netState = networkState;
     }
 
     /**
@@ -30,6 +35,11 @@ public class NetDiscoveryResponseMessage extends Message {
      */
     public List<NodeReference> getBrokersConnected() {
         return brokersConnected;
+    }
+
+    public NetworkState getNetworkState()
+    {
+        return netState;
     }
 
     @Override

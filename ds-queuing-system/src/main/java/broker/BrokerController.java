@@ -2,6 +2,7 @@ package broker;
 
 import messages.MessageType;
 import messages.network.*;
+import misc.NetworkState;
 import misc.NodeReference;
 import messages.Message;
 import messages.network.HelloRequestMessage;
@@ -115,6 +116,12 @@ public class BrokerController {
         connectToOtherBrokers();
         System.out.println("[INFO] Connected to " + nodesConnected.size() + " brokers.");
         System.out.println(nodesConnected);
+
+        if(message.getNetworkState() == NetworkState.NETWORK_CONNECTED)
+        {
+            System.out.println("[INFO] Network has already started, I'm joining again");
+            startRaft(true);
+        }
     }
 
     /**
@@ -124,13 +131,26 @@ public class BrokerController {
     private void onBrokersReadyMessage (BrokersReadyMessage message) {
         System.out.println("[INFO] Network ready to start: " + nodesConnected);
 
+        startRaft(false); // The network is starting now
+    }
+
+    /**
+     * Utility to start the execution of raft.
+     *
+     * @param networkAlreadyStarted True if the network has already started and this node is joining back after a crash.
+     */
+    private void startRaft(boolean networkAlreadyStarted)
+    {
         // Get the nodes list (removing the current node's name)
         final ArrayList<String> nodesList = nodesConnected.keySet().stream()
-            .filter(s -> !s.startsWith(brokerName))
-            .collect(Collectors.toCollection(ArrayList::new));
+                .filter(s -> !s.startsWith(brokerName))
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        System.out.println("Nodes list: " + nodesList);
+        System.out.println("Raft ready to start");
 
         // Start raft node
-        raftNode = new RaftNode<>(brokerName, nodesList, eventsQueue, this);
+        raftNode = new RaftNode<>(brokerName, nodesList, eventsQueue, this, networkAlreadyStarted);
         raftThread = new Thread() {
             public void run() {
                 raftNode.waitForEvents();

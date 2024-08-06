@@ -99,7 +99,7 @@ public class LocatorController {
      */
     public void onNetDiscoveryRequest (NetDiscoveryRequestMessage message, NodeHandler senderReference) {
         List<NodeReference> brokersConnected = getConnectedBrokers();
-        senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected));
+        senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected, networkState));
         // If all the required brokers are connected, send a message to all the brokers.
         // A small delay is set to allow all the residual messages to be properly exchanged.
         if (networkState == NetworkState.CONNECTING_BROKERS && this.brokersConnected == maximumBrokerNumber) {

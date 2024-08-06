@@ -7,6 +7,7 @@ import messages.application.LogRequest;
 import messages.application.LogResponse;
 import messages.application.VoteRequest;
 import messages.application.VoteResponse;
+import misc.NetworkState;
 
 import java.io.IOException;
 import java.util.*;
@@ -60,7 +61,7 @@ public class RaftNode<T> {
 //    private static final Integer LEADER_HEARTBEAT_TIMEOUT_MAX_RAND = 3000;
 
     private static final Integer LEADER_DISCONNECTION_TIMEOUT_MIN_RAND = 300;
-    private static final Integer LEADER_DISCONNECTION_TIMEOUT_MAX_RAND = 800;
+    private static final Integer LEADER_DISCONNECTION_TIMEOUT_MAX_RAND = 1800;
 
     /** Used to distinguish node*/
     private final String nodeId;
@@ -143,8 +144,10 @@ public class RaftNode<T> {
      * @param nodeId The univoqe id of the node being created.
      * @param nodesList The list of id of all the other nodes.
      * @param eventsQueue The reference to the queue where raft events are published.
+     * @param brokerController
+     * @param netAlreadyStarted True if the network has already started and this node is joining back after a crash.
      */
-    public RaftNode(String nodeId, ArrayList<String> nodesList, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController)
+    public RaftNode(String nodeId, ArrayList<String> nodesList, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController, boolean netAlreadyStarted)
     {
         // TODO: are these assertions needed?
         if(NUM_NODES % 2 == 0 || NUM_NODES < 3)
@@ -182,8 +185,19 @@ public class RaftNode<T> {
             diskBackupHandler.saveLog(log);
         }
 
-        // At the beginning I manually trigger the election (there is no leader yet)
-        onLeaderDisconnection();
+        if(!netAlreadyStarted)
+        {
+            // If the network isn't already running there is no leader,
+            // so I manually trigger an election
+            onLeaderDisconnection();
+        }
+        else if(nodesList.size() == 0)
+        {
+            // The network has already started, but I'm the only
+            // node present -> I run an election
+            // TODO: substitute with ASK_LEADER logic
+            onLeaderDisconnection();
+        }
     }
 
     /**
@@ -265,6 +279,8 @@ public class RaftNode<T> {
                 try { Thread.sleep(5); }
                 catch (Exception e) {}
             }
+
+            System.out.println("[INFO] Current state: " + currentRole.name());
         }
     }
 
@@ -313,6 +329,8 @@ public class RaftNode<T> {
         // that might trigger an election if this node doesn't receive
         // a vote request before the timeout fires.
         timeoutHandlerLeaderDisconnected.startNewTimeout();
+
+        currentLeader = null;
     }
 
     /**
@@ -372,23 +390,6 @@ public class RaftNode<T> {
      */
     private void onVoteRequest(final VoteRequest voteReq)
     {
-        // Signal message received
-        // I don't stop the timer because the candidate might fail during the election.
-        // That would leave the other followers waiting for him to become the leader.
-        // Should I start an election timer on the followers instead of signaling the reception?
-
-        // Another node has started an election, this node doesn't have to
-        timeoutHandlerLeaderDisconnected.disableAndRemove();
-
-        // Start an election timeout, which checks if the election takes too
-        // much time (the candidate might have failed)
-        if(timeoutHandlerElectionFollower.isRunning())
-        {
-            // If it was already started, stop it
-            timeoutHandlerElectionFollower.disableAndRemove();
-        }
-        timeoutHandlerElectionFollower.startNewTimeout();
-
         final Integer cLogLastTerm = voteReq.cLogLastTerm;
         final Integer cLogLength = voteReq.cLogLength;
 
@@ -423,6 +424,25 @@ public class RaftNode<T> {
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+
+        if(vote)
+        {
+            // The vote is positive
+
+            // Another node has started an election, and it can
+            // be a leader, this node doesn't have to start
+            // another election
+            timeoutHandlerLeaderDisconnected.disableAndRemove();
+
+            // Start an election timeout, which checks if the election takes too
+            // much time (the candidate might have failed)
+            if(timeoutHandlerElectionFollower.isRunning())
+            {
+                // If it was already started, stop it
+                timeoutHandlerElectionFollower.disableAndRemove();
+            }
+            timeoutHandlerElectionFollower.startNewTimeout();
+        }
 
         final Message msg = new VoteResponse(nodeId, currentTerm, vote);
         brokerController.sendMessage(voteReq.cId, msg);
