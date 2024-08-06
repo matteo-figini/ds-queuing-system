@@ -15,10 +15,21 @@ public enum MessageType
     LOG_REQUEST,
     /** Reply message to a log request, sent by a follower to the leader. */
     LOG_RESPONSE,
-    /** Election timeout event (the election process runs out of time). */
-    ELECTION_TIMEOUT,
+    /** Election timeout event (the election process runs out of time) generated from the candidate. */
+    ELECTION_OUT_OF_TIME_CANDIDATE,
+    /** Election timeout event (the election process runs out of time) generated from the followers
+     * (might be a candidate fail). */
+    ELECTION_OUT_OF_TIME_FOLLOWER,
     /** Leader heartbeat timeout event (followers haven't received an update from the leader). */
-    LEADER_HEARTBEAT_TIMEOUT,
+//    LEADER_HEARTBEAT_TIMEOUT,
+    /** Used to notify the leader that it has to send the heartbeat message to the followers. */
+//    LEADER_HEARTBEAT_NOTIFY,
+    /** The actual heartbeat message sent by the leader. */
+//    LEADER_HEARTBEAT_MESSAGE,
+    /** Message sent to each active follower when the socket detects the leader disconnection. */
+    LEADER_DISCONNECTED,
+    /** Timeout after leader disconnection is elasped, node is allowed to start an election. */
+    START_ELECTION,
 
     /* ---------- NETWORK MESSAGES ---------- */
     HELLO_REQUEST,

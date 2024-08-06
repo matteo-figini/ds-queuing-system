@@ -1,15 +1,21 @@
 package broker;
 
+import messages.MessageType;
 import messages.network.*;
 import misc.NodeReference;
 import messages.Message;
+import messages.network.HelloRequestMessage;
+import messages.network.HelloResponseMessage;
+import messages.network.NetDiscoveryRequestMessage;
+import messages.network.NetDiscoveryResponseMessage;
+import raft.RaftNode;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 
 /**
  * This class represents the main element of a broker, managing all the underlying logic
@@ -23,6 +29,10 @@ public class BrokerController {
     // by their name.
     private final HashMap<String, NodeReference> nodesConnected = new HashMap<>();
     private String leaderBroker;
+
+    private RaftNode<Integer> raftNode;
+    Thread raftThread;
+    private LinkedBlockingQueue<Message> eventsQueue = new LinkedBlockingQueue<>();
 
     /**
      * Create the {@code BrokerController} instance.
@@ -72,6 +82,11 @@ public class BrokerController {
                 case HELLO_RESPONSE -> onHelloResponseMessage((HelloResponseMessage) message);
                 case NET_DISCOVERY_RESPONSE -> onNetDiscoveryResponseMessage((NetDiscoveryResponseMessage) message);
                 case BROKERS_READY_MESSAGE -> onBrokersReadyMessage((BrokersReadyMessage) message);
+                case VOTE_REQUEST, VOTE_RESPONSE, LOG_REQUEST, LOG_RESPONSE, ELECTION_OUT_OF_TIME_CANDIDATE, ELECTION_OUT_OF_TIME_FOLLOWER,
+                     LEADER_DISCONNECTED, START_ELECTION -> {
+                    // Raft messages
+                    eventsQueue.add(message);
+                }
                 default -> System.out.println("[ERROR] Unknown message type " + message.type);
             }
         }
@@ -108,25 +123,21 @@ public class BrokerController {
      */
     private void onBrokersReadyMessage (BrokersReadyMessage message) {
         System.out.println("[INFO] Network ready to start: " + nodesConnected);
-        // TODO (to Raft): start a countdown for the leader election
 
-        // DEBUG: fake the creation of the leader
-        if (this.brokerName.equals("b1")) {
-            ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-            executor.schedule(() -> {
-                try {
-                    sendMessage("locator", new NewElectedLeaderMessage(new NodeReference(
-                            Inet4Address.getLocalHost().getHostAddress(),
-                            brokerNetwork.getBrokerPublicPort(),
-                            this.brokerName,
-                            true
-                    )));
-                } catch (UnknownHostException e) {
-                    throw new RuntimeException(e);
-                }
-            }, 1500, TimeUnit.MILLISECONDS);
-        }
-        // END DEBUG
+        // Get the nodes list (removing the current node's name)
+        final ArrayList<String> nodesList = nodesConnected.keySet().stream()
+            .filter(s -> !s.startsWith(brokerName))
+            .collect(Collectors.toCollection(ArrayList::new));
+
+        // Start raft node
+        raftNode = new RaftNode<>(brokerName, nodesList, eventsQueue, this);
+        raftThread = new Thread() {
+            public void run() {
+                raftNode.waitForEvents();
+            }
+        };
+        raftThread.start();
+        System.out.println("[INFO] Raft thread started");
     }
 
     /**
@@ -137,8 +148,17 @@ public class BrokerController {
         if (this.leaderBroker != null && this.leaderBroker.equals(disconnectedNode)) {
             this.leaderBroker = null;
             System.out.println("[INFO] Leader broker disconnected.");
-            // TODO (to Raft): start a countdown for the leader election.
+
+            eventsQueue.add(new Message(MessageType.LEADER_DISCONNECTED));
         }
+    }
+
+    /**
+     * Setter for `leaderBroker`.
+     * @param nodeId The id of the current leader of the network.
+     */
+    public void setLeaderBroker(String nodeId) {
+        leaderBroker = nodeId;
     }
 
     /**

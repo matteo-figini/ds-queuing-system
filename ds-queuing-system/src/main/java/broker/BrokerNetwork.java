@@ -17,6 +17,9 @@ import java.util.concurrent.TimeUnit;
  * acting as a "server".
  */
 public class BrokerNetwork {
+
+    public static final String ALL_BROKERS_CMD = "all-brokers";
+
     // Locator's connection
     private LocatorSocket socketToLocator;
 
@@ -116,7 +119,7 @@ public class BrokerNetwork {
         if (receiver.equalsIgnoreCase("locator")) {
             // Send the message to the locator
             socketToLocator.sendMessage(message);
-        } else if (receiver.equalsIgnoreCase("all-brokers")) {
+        } else if (receiver.equalsIgnoreCase(ALL_BROKERS_CMD)) {
             // Send a broadcast message to the other brokers
             otherBrokersSockets.forEach((key, value) -> value.sendMessage(message));
             otherBrokersClientHandlers.forEach((key, value) -> value.sendMessage(message));
