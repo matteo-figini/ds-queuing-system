@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
  */
 public class BrokerController {
     private final String brokerName;
+    private final String localIPAddress;
     private BrokerNetwork brokerNetwork;
 
     // This structure keeps a reference to every other node (broker or client) connected to the broker, identified
@@ -39,17 +40,18 @@ public class BrokerController {
      * Create the {@code BrokerController} instance.
      * @param brokerName Name of the broker.
      */
-    public BrokerController (String brokerName) {
+    public BrokerController (String brokerName, String localIPAddress) {
         this.brokerName = brokerName;
+        this.localIPAddress = localIPAddress;
         this.leaderBroker = null;
     }
 
     /**
      * Send a {@code HelloRequestMessage} to the locator.
      */
-    public void startCommunicationGreetings (String localIPAddress) {
+    public void startCommunicationGreetings () {
         int publicPort = brokerNetwork.getBrokerPublicPort();
-        HelloRequestMessage helloMessage = new HelloRequestMessage(localIPAddress, publicPort, brokerName, true);
+        HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, publicPort, this.brokerName, true);
         brokerNetwork.sendMessage("locator", helloMessage);
     }
 

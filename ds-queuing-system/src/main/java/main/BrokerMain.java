@@ -21,10 +21,10 @@ public class BrokerMain {
         int publicPort = askPort("Insert the public port on which the broker will listen to new connections: ");
         String personalIPAddress = retrieveIPAddress();
 
-        BrokerController brokerController = new BrokerController(brokerName);
+        BrokerController brokerController = new BrokerController(brokerName, personalIPAddress);
         BrokerNetwork brokerNetwork = new BrokerNetwork(brokerController, locatorIPAddress, locatorPort, publicPort);
         brokerController.setBrokerNetwork(brokerNetwork);
-        brokerController.startCommunicationGreetings(personalIPAddress);
+        brokerController.startCommunicationGreetings();
     }
 
     /**
