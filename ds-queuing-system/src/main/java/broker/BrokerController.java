@@ -184,6 +184,19 @@ public class BrokerController {
     }
 
     /**
+     * Function called from raft whenever the node becomes the new leader. Used
+     * to notify the locator about the new leader's identity.
+     */
+    public void notifyLocatorImLeader()
+    {
+        final NodeReference nodeRef = new NodeReference(localIPAddress, brokerNetwork.getBrokerPublicPort(), brokerName, true);
+
+        final NewElectedLeaderMessage msg = new NewElectedLeaderMessage(nodeRef);
+
+        sendMessage("locator", msg);
+    }
+
+    /**
      * Add the reference of the {@code NodeReference} passed as parameter to the map associating each string (the name
      * of the node) to the corresponding {@code NodeReference} and print a message.
      * @param nodeReference Representation of the new connected node.

@@ -533,7 +533,7 @@ public class RaftNode<T> {
                     }
                 }
 
-                // TODO: Notify the locator
+                brokerController.notifyLocatorImLeader();
             }
         }
         else if(term > currentTerm)
