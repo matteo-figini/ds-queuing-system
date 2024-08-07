@@ -47,7 +47,18 @@ public class TimeoutChecker
      */
     private int timeout;
 
-    private Mode mode;
+    /**
+     * Period of time between one sleep of the timeout thread and the other.
+     * Expressed in milliseconds.
+     *
+     * This is done so that there's no need to wait for the entire timeout
+     * before we can safely stop the thread and join: if the timeout is 5
+     * seconds and after 1s we want to stop, we have to wait for other 4
+     * seconds before the join succeeds.
+     */
+    private static final Integer sleepPeriod = 50;
+
+    private final Mode mode;
 
     /**
      * This boolean is set to true when the expected event
@@ -100,14 +111,20 @@ public class TimeoutChecker
 
         while(keepGoing)
         {
-            try
+            // Sleep period
+            int i = 0;
+            while(keepGoing && sleepPeriod * i < timeout)
             {
-                Thread.sleep(timeout);
-            } catch (Exception e) {}
+                try
+                {
+                    Thread.sleep(sleepPeriod);
+                } catch (Exception e) {}
+                synchronized (mutexStopFlag)
+                {
+                    keepGoing = !stopFlag;
+                }
 
-            synchronized (mutexStopFlag)
-            {
-                keepGoing = !stopFlag;
+                i++;
             }
 
             if(keepGoing)
