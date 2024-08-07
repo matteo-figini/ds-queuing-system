@@ -30,6 +30,10 @@ public enum MessageType
     LEADER_DISCONNECTED,
     /** Timeout after leader disconnection is elasped, node is allowed to start an election. */
     START_ELECTION,
+    /** When a node rejoins an already started network it asks others who the current leader is. */
+    ASK_LEADER_REQUEST,
+    /** Response to an ASK_LEADER message. */
+    ASK_LEADER_RESPONSE,
 
     /* ---------- NETWORK MESSAGES ---------- */
     HELLO_REQUEST,

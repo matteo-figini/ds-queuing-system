@@ -166,7 +166,9 @@ public class TimeoutChecker
         //  to safely stop. Then create a new one.
         if(isRunning())
         {
-            throw new RuntimeException("TimeoutChecker::startNewTimeout(): ALREADY STARTED");
+//            throw new RuntimeException("TimeoutChecker::startNewTimeout(): ALREADY STARTED");
+            System.out.println("TimeoutChecker::startNewTimeout(): already going, stopping now and restarting");
+            disableAndRemove();
         }
 
         disabled = false;
@@ -220,6 +222,15 @@ public class TimeoutChecker
         synchronized (mutexStopFlag)
         {
             stopFlag = true;
+        }
+
+        try
+        {
+            timeoutThread.join();
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
         }
     }
 

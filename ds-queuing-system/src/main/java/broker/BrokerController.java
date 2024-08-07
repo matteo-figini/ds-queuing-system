@@ -84,7 +84,7 @@ public class BrokerController {
                 case NET_DISCOVERY_RESPONSE -> onNetDiscoveryResponseMessage((NetDiscoveryResponseMessage) message);
                 case BROKERS_READY_MESSAGE -> onBrokersReadyMessage((BrokersReadyMessage) message);
                 case VOTE_REQUEST, VOTE_RESPONSE, LOG_REQUEST, LOG_RESPONSE, ELECTION_OUT_OF_TIME_CANDIDATE, ELECTION_OUT_OF_TIME_FOLLOWER,
-                     LEADER_DISCONNECTED, START_ELECTION -> {
+                     LEADER_DISCONNECTED, START_ELECTION, ASK_LEADER_REQUEST, ASK_LEADER_RESPONSE -> {
                     // Raft messages
                     eventsQueue.add(message);
                 }
