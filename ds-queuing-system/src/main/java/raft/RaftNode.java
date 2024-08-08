@@ -477,6 +477,8 @@ public class RaftNode<T> {
             // another election
             timeoutHandlerLeaderDisconnected.disableAndRemove();
 
+            // TODO: should i block timeoutHandlerElectionCandidate too?
+
             // Start an election timeout, which checks if the election takes too
             // much time (the candidate might have failed)
             if(timeoutHandlerElectionFollower.isRunning())

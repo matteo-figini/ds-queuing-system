@@ -1,5 +1,7 @@
 package broker;
 
+import application.AppQueueManager;
+import application.Operation;
 import messages.MessageType;
 import messages.network.*;
 import misc.NetworkState;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
+import java.util.List;
 
 /**
  * This class represents the main element of a broker, managing all the underlying logic
@@ -32,9 +35,13 @@ public class BrokerController {
     private final HashMap<String, NodeReference> nodesConnected = new HashMap<>();
     private String leaderBroker;
 
-    private RaftNode<Integer> raftNode;
+    // Raft stuff
+    private RaftNode<Operation> raftNode;
     Thread raftThread;
     private LinkedBlockingQueue<Message> eventsQueue = new LinkedBlockingQueue<>();
+
+    // Application stuff
+    AppQueueManager queueManager = new AppQueueManager();
 
     /**
      * Create the {@code BrokerController} instance.
@@ -224,5 +231,14 @@ public class BrokerController {
                 System.out.println("[EXCEPTION] " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * Used to recreate the queues from the raft log.
+     * @param listOperations The list of operations used to recreate the queues.
+     */
+    public void recreateQueuesFromLog(final List<Operation> listOperations)
+    {
+        queueManager.recreateFromLog(listOperations);
     }
 }
