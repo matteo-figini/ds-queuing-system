@@ -51,7 +51,7 @@ public class RaftNode<T> {
     private final String nodeId;
 
     /** List of nodeId of the other nodes in the network*/
-    private final ArrayList<String> nodesList;
+    private final Set<String> nodesConnected;
 
     private NodeState currentRole;
 
@@ -133,12 +133,12 @@ public class RaftNode<T> {
      * Class constructor.
      *
      * @param nodeId The univoqe id of the node being created.
-     * @param nodesList The list of id of all the other nodes.
+     * @param nodesConnected Reference to the list of the active nodes.
      * @param eventsQueue The reference to the queue where raft events are published.
      * @param brokerController
      * @param netAlreadyStarted True if the network has already started and this node is joining back after a crash.
      */
-    public RaftNode(String nodeId, ArrayList<String> nodesList, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController, boolean netAlreadyStarted)
+    public RaftNode(String nodeId, final Set<String> nodesConnected, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController, boolean netAlreadyStarted)
     {
         // TODO: are these assertions needed?
         if(NUM_NODES % 2 == 0 || NUM_NODES < 3)
@@ -147,7 +147,7 @@ public class RaftNode<T> {
         }
 
         this.nodeId = nodeId;
-        this.nodesList = nodesList;
+        this.nodesConnected = nodesConnected;
         this.eventsQueue = eventsQueue;
         this.brokerController = brokerController;
 
@@ -157,10 +157,14 @@ public class RaftNode<T> {
         ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER = ELECTION_OUT_OF_TIME_TIMEOUT_CANDIDATE + randTimeout + 500;
         ASK_LEADER_REQUEST_TIMEOUT = ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER;
 
-        timeoutHandlerLeaderDisconnected = new TimeoutChecker(eventsQueue, randTimeout + 500, new Message(MessageType.START_ELECTION), TimeoutChecker.Mode.EXPLICIT);
+        timeoutHandlerLeaderDisconnected = new TimeoutChecker(eventsQueue, randTimeout + 500,
+                new Message(MessageType.START_ELECTION), TimeoutChecker.Mode.EXPLICIT);
         timeoutHandlerElectionFollower = new TimeoutChecker(eventsQueue, ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER + randTimeout,
                 new Message(MessageType.ELECTION_OUT_OF_TIME_FOLLOWER), TimeoutChecker.Mode.EXPLICIT);
-        timeoutHandlerAskLeaderRequest = new TimeoutChecker(eventsQueue, ASK_LEADER_REQUEST_TIMEOUT, new Message(MessageType.LEADER_DISCONNECTED), TimeoutChecker.Mode.EXPLICIT);
+        timeoutHandlerAskLeaderRequest = new TimeoutChecker(eventsQueue, ASK_LEADER_REQUEST_TIMEOUT,
+                new Message(MessageType.LEADER_DISCONNECTED), TimeoutChecker.Mode.EXPLICIT);
+        timeoutHandlerElectionCandidate = new TimeoutChecker(eventsQueue, ELECTION_OUT_OF_TIME_TIMEOUT_CANDIDATE,
+                new Message(MessageType.ELECTION_OUT_OF_TIME_CANDIDATE), TimeoutChecker.Mode.EXPLICIT);
 
         // Init backup
         diskBackupHandler = new LogFilesHandler<>(nodeId + "log.dat", nodeId + "status.dat");
@@ -242,25 +246,13 @@ public class RaftNode<T> {
                         this.onLogResponse((LogResponse) m);
                         break;
                     case ELECTION_OUT_OF_TIME_CANDIDATE:
-                        if(!timeoutHandlerElectionCandidate.isDisabled())
-                        {
-                            // This timeout might become invalid because this
-                            // node has received a vote response from a node
-                            // with a higher term -> this node cannot be a candidate
-                            System.out.println("[INFO] Received election timeout event");
-                            this.onElectionTimeout();
-                        }
-                        // If the timeout was disabled the event is ignored
-                        // TODO: is this check needed? isn't it already checked by disableAndRemove()?
+                        System.out.println("[INFO] Received election timeout event");
+                        this.onElectionTimeout();
                         break;
                     case ELECTION_OUT_OF_TIME_FOLLOWER:
                         System.out.println("[INFO] Candidate's election took too much time, starting an election myself");
                         this.onLeaderDisconnection();
                         break;
-//                    case LEADER_HEARTBEAT_TIMEOUT:
-//                        System.out.println("[INFO] Received heartbeat timeout event");
-//                        this.onLeaderTimeout();
-//                        break;
                     case LEADER_DISCONNECTED:
                         System.out.println("[INFO] The leader has disconnected");
                         this.onLeaderDisconnection();
@@ -405,16 +397,7 @@ public class RaftNode<T> {
         brokerController.sendMessage(BrokerNetwork.ALL_BROKERS_CMD, voteMsg);
 
         // Start election timer
-        if(timeoutHandlerElectionCandidate != null && timeoutHandlerElectionCandidate.isRunning())
-        {
-            timeoutHandlerElectionCandidate.disableAndRemove();
-            throw new RuntimeException("CAZZO electionTimeoutHandlerCandidate STAVA ANDANDO");
-            // TODO: fix
-        }
-        timeoutHandlerElectionCandidate = new TimeoutChecker(eventsQueue,
-                ELECTION_OUT_OF_TIME_TIMEOUT_CANDIDATE,
-                new Message(MessageType.ELECTION_OUT_OF_TIME_CANDIDATE),
-                TimeoutChecker.Mode.EXPLICIT);
+        timeoutHandlerElectionCandidate.disableAndRemove(); // Might be already active, restart
         timeoutHandlerElectionCandidate.startNewTimeout();
     }
 
@@ -442,7 +425,7 @@ public class RaftNode<T> {
         {
             currentTerm = voteReq.cTerm;
             currentRole = NodeState.FOLLOWER;
-            votedFor = null; // TODO: is it consistent?
+            votedFor = null;
         }
 
         Integer lastTerm = 0;
@@ -455,7 +438,7 @@ public class RaftNode<T> {
                 (Objects.equals(cLogLastTerm, lastTerm) && cLogLength >= log.size());
 
         // True if this node voted for this candidate or none
-        boolean votedForOk = votedFor == null || votedFor.equals(voteReq.cId); // TODO: is `null` consistent?
+        boolean votedForOk = votedFor == null || votedFor.equals(voteReq.cId);
 
         boolean vote;
         if(voteReq.cTerm.equals(currentTerm) && logOk && votedForOk)
@@ -477,15 +460,12 @@ public class RaftNode<T> {
             // another election
             timeoutHandlerLeaderDisconnected.disableAndRemove();
 
-            // TODO: should i block timeoutHandlerElectionCandidate too?
+            // If an election was already running is now
+            // stopped -> disable the timeout
+            timeoutHandlerElectionCandidate.disableAndRemove();
 
             // Start an election timeout, which checks if the election takes too
             // much time (the candidate might have failed)
-            if(timeoutHandlerElectionFollower.isRunning())
-            {
-                // If it was already started, stop it
-                timeoutHandlerElectionFollower.disableAndRemove();
-            }
             timeoutHandlerElectionFollower.startNewTimeout();
         }
 
@@ -524,7 +504,7 @@ public class RaftNode<T> {
                 timeoutHandlerElectionCandidate.disableAndRemove();
 
                 // Send first message to each follower
-                for(String followerId : nodesList)
+                for(String followerId : nodesConnected)
                 {
                     if(!Objects.equals(followerId, nodeId))
                     {
@@ -574,7 +554,7 @@ public class RaftNode<T> {
         // Update ackedLength of the leader
         ackedLength.put(nodeId, log.size());
 
-        for(String followerId : nodesList)
+        for(String followerId : nodesConnected)
         {
             if(!Objects.equals(followerId, nodeId)) // Avoid leader sending to himself
             {
@@ -648,29 +628,16 @@ public class RaftNode<T> {
      */
     private void onLogRequest(final LogRequest<T> logRequest)
     {
-        // Check if there were timeouts running
-        if(timeoutHandlerElectionFollower != null && timeoutHandlerElectionFollower.isRunning())
-        {
-            timeoutHandlerElectionFollower.disableAndRemove();
-        }
-        if(timeoutHandlerElectionCandidate != null && timeoutHandlerElectionCandidate.isRunning())
-        {
-            timeoutHandlerElectionCandidate.disableAndRemove();
-        }
-        if(timeoutHandlerLeaderDisconnected != null && timeoutHandlerLeaderDisconnected.isRunning())
-        {
-            timeoutHandlerLeaderDisconnected.disableAndRemove();
-        }
+        // Check if there were timeouts running, stop them if needed
+        timeoutHandlerElectionFollower.disableAndRemove();
+        timeoutHandlerElectionCandidate.disableAndRemove();
+        timeoutHandlerLeaderDisconnected.disableAndRemove();
+        timeoutHandlerAskLeaderRequest.disableAndRemove();
 
         if(logRequest.term > currentTerm)
         {
             currentTerm = logRequest.term;
-            votedFor = null; // TODO: is it consistent?
-
-            // Cancel election timer
-            // TODO: teoricamente posso rimuoverlo perchè non c'è più bisogno di ricevere l'heartbeat,
-            //  sappiamo se il leader è morto tramite le socket
-//            electionTimeoutHandler.stop();
+            votedFor = null;
         }
 
         if(logRequest.term.equals(currentTerm))
@@ -803,7 +770,7 @@ public class RaftNode<T> {
         while(commitLength < log.size() && keepGoing)
         {
             int acks = 0;
-            for(String node : nodesList)
+            for(String node : nodesConnected)
             {
                 if(ackedLength.get(node) > commitLength)
                 {
@@ -811,7 +778,7 @@ public class RaftNode<T> {
                 }
             }
 
-            if(acks > (nodesList.size() + 1) / 2)
+            if(acks > (nodesConnected.size() + 1) / 2)
             {
                 // deliver log[commitLength].msg to the application
                 // TODO: is this enough? It should be for now, at least for testing.

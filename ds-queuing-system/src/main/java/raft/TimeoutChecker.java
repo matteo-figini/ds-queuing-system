@@ -81,14 +81,6 @@ public class TimeoutChecker
     private final Object mutexRunning = new Object();
 
     /**
-     * This flag signals when the timeout was disabled by the user,
-     * regardless of the timeout status (triggered, event received,
-     * still running). If the timeout was disabled then the event
-     * that it might have generated must be ignored.
-     */
-    private boolean disabled = false;
-
-    /**
      * The thread controlling the timeout event.
      */
     private Thread timeoutThread;
@@ -175,20 +167,17 @@ public class TimeoutChecker
     }
 
     /**
-     * Start signal for the timeout checker.
+     * Start signal for the timeout checker. If already running
+     * the timeout is stopped and a new one is started.
      */
     public void startNewTimeout()
     {
-        // TODO: remove this assert and substitute it with a check that forces the timeout
-        //  to safely stop. Then create a new one.
         if(isRunning())
         {
-//            throw new RuntimeException("TimeoutChecker::startNewTimeout(): ALREADY STARTED");
             System.out.println("TimeoutChecker::startNewTimeout(): already going, stopping now and restarting");
             disableAndRemove();
         }
 
-        disabled = false;
         eventReceived = false;
         stopFlag = false;
         running = false;
@@ -207,16 +196,14 @@ public class TimeoutChecker
      */
     public void disableAndRemove()
     {
-        disabled = true;
+        if(!isRunning())
+        {
+            return;
+        }
 
         stop();
 
         removeFiredEvent();
-    }
-
-    public boolean isDisabled()
-    {
-        return disabled;
     }
 
     /**

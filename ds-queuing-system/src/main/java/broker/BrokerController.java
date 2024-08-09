@@ -150,16 +150,10 @@ public class BrokerController {
      */
     private void startRaft(boolean networkAlreadyStarted)
     {
-        // Get the nodes list (removing the current node's name)
-        final ArrayList<String> nodesList = nodesConnected.keySet().stream()
-                .filter(s -> !s.startsWith(brokerName))
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        System.out.println("Nodes list: " + nodesList);
         System.out.println("Raft ready to start");
 
         // Start raft node
-        raftNode = new RaftNode<>(brokerName, nodesList, eventsQueue, this, networkAlreadyStarted);
+        raftNode = new RaftNode<>(brokerName, nodesConnected.keySet(), eventsQueue, this, networkAlreadyStarted);
         raftThread = new Thread() {
             public void run() {
                 raftNode.waitForEvents();
