@@ -1,6 +1,9 @@
 package client;
 
 import messages.Message;
+import messages.application.AppendQueueResponse;
+import messages.application.CreateQueueResponse;
+import messages.application.ReadQueueResponse;
 import messages.network.*;
 
 import java.net.Inet4Address;
@@ -35,7 +38,7 @@ public class ClientController {
      */
     public void setClientNetwork(ClientNetwork clientNetwork) {
         this.clientNetwork = clientNetwork;
-        this.commandInterpreter = new CommandInterpreter(this);
+        this.commandInterpreter = new CommandInterpreter(this, clientName);
         clientNetwork.readMessagesFromLocator();
     }
 
@@ -83,6 +86,9 @@ public class ClientController {
             switch (message.type) {
                 case HELLO_RESPONSE -> onHelloResponseMessage((HelloResponseMessage) message, sender);
                 case LEADER_DISCOVERY_RESPONSE -> onLeaderDiscoveryResponse((LeaderDiscoveryResponse) message, sender);
+                case CREATE_QUEUE_RESPONSE -> onCreateQueueResponse((CreateQueueResponse) message);
+                case READ_QUEUE_RESPONSE -> onReadQueueResponse((ReadQueueResponse) message);
+                case APPEND_QUEUE_RESPONSE -> onAppendQueueResponse((AppendQueueResponse) message);
                 default -> System.out.println("[EXCEPTION] Unhandled message type: " + message.type);
             }
         }
@@ -117,6 +123,8 @@ public class ClientController {
         } else {
             System.out.println("[INFO] Setting available leader: " + message.getLeaderReference().nodeName());
             clientNetwork.connectToBrokerLeader(message.getLeaderReference());
+
+            askCommand();
         }
     }
 
@@ -128,5 +136,60 @@ public class ClientController {
         ScheduledExecutorService newLeaderRequest = Executors.newSingleThreadScheduledExecutor();
         newLeaderRequest.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()),
                 1, TimeUnit.SECONDS);
+    }
+
+    private void askCommand()
+    {
+        Scanner s = new Scanner(System.in);
+        System.out.print("> Insert command: ");
+        String command = s.nextLine();
+        System.out.println("Command inserted: " + command);
+
+        commandInterpreter.interpretAndSendCommand(command);
+    }
+
+    private void onCreateQueueResponse(final CreateQueueResponse response)
+    {
+        if(response.getStatus())
+        {
+           System.out.println("[INFO] Queue correctly created");
+        }
+        else
+        {
+            System.out.println("[ERROR] An error occurred while attempting to create the queue: " +
+                    response.getInfoMessage());
+        }
+
+        askCommand();
+    }
+
+    private void onAppendQueueResponse(final AppendQueueResponse response)
+    {
+        if(response.getStatus())
+        {
+            System.out.println("[INFO] Append correctly executed");
+        }
+        else
+        {
+            System.out.println("[ERROR] An error occurred while attempting to append to the queue: " +
+                    response.getInfoMessage());
+        }
+
+        askCommand();
+    }
+
+    private void onReadQueueResponse(final ReadQueueResponse response)
+    {
+        if(response.getStatus())
+        {
+            System.out.println("[INFO] Value from the queue: " + response.getElementsRead());
+        }
+        else
+        {
+            System.out.println("[ERROR] An error occurred while attempting to read from the queue: " +
+                    response.getInfoMessage());
+        }
+
+        askCommand();
     }
 }

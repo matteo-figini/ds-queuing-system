@@ -18,7 +18,7 @@ public class LogRequest<T> extends Message implements Serializable {
     public final Integer prefixLen;
     public final Integer prefixTerm;
     public final Integer leaderCommit;
-    public final List<LogItem<T>> suffix;
+    public final List<LogItem> suffix;
 
     /**
      * Constructor of a vote request message.
@@ -32,7 +32,7 @@ public class LogRequest<T> extends Message implements Serializable {
      * @param suffix The actual entries to be added to the log.
      */
     public LogRequest(String leaderId, Integer term, Integer prefixLen, Integer prefixTerm,
-                      Integer leaderCommit, List<LogItem<T>> suffix)
+                      Integer leaderCommit, List<LogItem> suffix)
     {
         super(MessageType.LOG_REQUEST);
 

@@ -5,7 +5,7 @@ package application.exceptions;
  * that doesn't correspond with any of the active queues.
  */
 public class QueueNotFoundException extends Exception{
-    public QueueNotFoundException(String message){
-        super(message);
+    public QueueNotFoundException(){
+        super("There is no queue corresponding to the name given");
     }
 }

@@ -34,6 +34,8 @@ public enum MessageType
     ASK_LEADER_REQUEST,
     /** Response to an ASK_LEADER message. */
     ASK_LEADER_RESPONSE,
+    /** Request to append a message in the raft log. */
+    RAFT_APPEND_MESSAGE,
 
     /* ---------- NETWORK MESSAGES ---------- */
     HELLO_REQUEST,

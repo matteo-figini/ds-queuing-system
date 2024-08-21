@@ -5,7 +5,7 @@ import application.exceptions.NameAlreadyUsedException;
 import application.exceptions.QueueNotFoundException;
 import application.operations.CreateQueue;
 import application.operations.ReadQueue;
-import application.operations.WriteQueue;
+import application.operations.AppendQueue;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,11 +32,11 @@ public class AppQueueManager {
      * @throws QueueNotFoundException Thrown if there is no queue with such name.
      * @throws EndOfQueueException Thrown if the user reached the end of the queue.
      */
-    public Integer read(final String queueName, final String readerName) throws QueueNotFoundException, EndOfQueueException
+    public Integer commitRead(final String queueName, final String readerName) throws QueueNotFoundException, EndOfQueueException
     {
         if(!mapQueues.containsKey(queueName))
         {
-            throw new QueueNotFoundException("There is no queue corresponding to the name given");
+            throw new QueueNotFoundException();
         }
 
         return mapQueues.get(queueName).get(readerName);
@@ -48,11 +48,11 @@ public class AppQueueManager {
      * @param value The value to be inserted.
      * @throws QueueNotFoundException Thrown if there is no queue with such name.
      */
-    public void insert(final String queueName, final Integer value) throws QueueNotFoundException
+    public void commitAppend(final String queueName, final Integer value) throws QueueNotFoundException
     {
         if(!mapQueues.containsKey(queueName))
         {
-            throw new QueueNotFoundException("There is no queue corresponding to the name given");
+            throw new QueueNotFoundException();
         }
 
         mapQueues.get(queueName).add(value);
@@ -63,11 +63,11 @@ public class AppQueueManager {
      * @param queueName The name of the queue.
      * @throws NameAlreadyUsedException Thrown if the name is already used.
      */
-    public void create(final String queueName) throws NameAlreadyUsedException
+    public void commitCreate(final String queueName) throws NameAlreadyUsedException
     {
         if(mapQueues.containsKey(queueName))
         {
-            throw new NameAlreadyUsedException("There is already a queue using that name");
+            throw new NameAlreadyUsedException();
         }
 
         AppQueue newQueue = new AppQueue(queueName);
@@ -92,7 +92,7 @@ public class AppQueueManager {
             switch (op.getType())
             {
                 case READ_QUEUE -> recreateRead((ReadQueue) op);
-                case WRITE_QUEUE -> recreateWrite((WriteQueue) op);
+                case APPEND_QUEUE -> recreateWrite((AppendQueue) op);
                 case CREATE_QUEUE -> recreateCreate((CreateQueue) op);
             }
         }
@@ -102,7 +102,7 @@ public class AppQueueManager {
     {
         try
         {
-            read(op.queueName, op.readerName);
+            commitRead(op.queueName, op.readerName);
         }
         catch (Exception e)
         {
@@ -111,11 +111,11 @@ public class AppQueueManager {
         }
     }
 
-    private void recreateWrite(WriteQueue op)
+    private void recreateWrite(AppendQueue op)
     {
         try
         {
-            insert(op.queueName, op.value);
+            commitAppend(op.queueName, op.value);
         }
         catch (Exception e)
         {
@@ -128,12 +128,42 @@ public class AppQueueManager {
     {
         try
         {
-            create(op.queueName);
+            commitCreate(op.queueName);
         }
         catch (Exception e)
         {
             e.printStackTrace();
             throw new RuntimeException("The log is faulty, exception while recreating queues");
+        }
+    }
+
+    public void tryCreateQueue(final String queueName) throws NameAlreadyUsedException
+    {
+        if(mapQueues.containsKey(queueName))
+        {
+            throw new NameAlreadyUsedException();
+        }
+    }
+
+    public void tryReadQueue(final String queueName, final String readerName) throws QueueNotFoundException, EndOfQueueException
+    {
+        if(!mapQueues.containsKey(queueName))
+        {
+            throw new QueueNotFoundException();
+        }
+
+        mapQueues.get(queueName).tryGet(readerName);
+    }
+
+    public void printQueues()
+    {
+        System.out.println("- Queues: ---------");
+
+        for(String queueName : mapQueues.keySet())
+        {
+            final AppQueue queue = mapQueues.get(queueName);
+
+            System.out.println(queue.toString());
         }
     }
 }

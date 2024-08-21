@@ -7,7 +7,7 @@ import javax.naming.Name;
  * that is already used by another queue.
  */
 public class NameAlreadyUsedException extends Exception{
-    public NameAlreadyUsedException(String message){
-        super(message);
+    public NameAlreadyUsedException(){
+        super("There is already a queue using that name");
     }
 }

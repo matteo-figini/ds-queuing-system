@@ -5,7 +5,7 @@ package application.exceptions;
  * is trying to read.
  */
 public class EndOfQueueException extends Exception {
-    public EndOfQueueException(String message){
-        super(message);
+    public EndOfQueueException(){
+        super("End of the queue reached");
     }
 }

@@ -14,13 +14,15 @@ import java.util.stream.IntStream;
  */
 public class CommandInterpreter {
     private final ClientController clientControllerRef;
+    private final String clientName;
 
     /**
      * Creates the instance of {@code CommandInterpreter}.
      * @param clientControllerRef Reference to the current {@code ClientController}.
      */
-    public CommandInterpreter (ClientController clientControllerRef) {
+    public CommandInterpreter (ClientController clientControllerRef, String clientName) {
         this.clientControllerRef = clientControllerRef;
+        this.clientName = clientName;
     }
 
     /**
@@ -47,7 +49,7 @@ public class CommandInterpreter {
      */
     private void interpretCreateCommand (String[] commandParts) {
         if (commandParts.length < 2) return;
-        CreateQueueRequest createQueueRequest = new CreateQueueRequest(commandParts[1]);
+        CreateQueueRequest createQueueRequest = new CreateQueueRequest(commandParts[1], clientName);
         System.out.println(createQueueRequest);
         clientControllerRef.sendMessage("leader", createQueueRequest);
     }
@@ -61,6 +63,7 @@ public class CommandInterpreter {
     private void interpretAppendCommand (String[] commandParts) {
         if (commandParts.length < 2) return;
         List<Integer> elementsToAppend = IntStream.range(2, commandParts.length).mapToObj(i -> Integer.parseInt(commandParts[i])).collect(Collectors.toList());
+        // TODO: add client name
         AppendQueueRequest appendQueueRequest = new AppendQueueRequest(commandParts[1], elementsToAppend);
         System.out.println(appendQueueRequest);
         clientControllerRef.sendMessage("leader", appendQueueRequest);
@@ -74,6 +77,7 @@ public class CommandInterpreter {
      */
     private void interpretReadCommand (String[] commandParts) {
         if (commandParts.length < 2) return;
+        // TODO: add client name
         ReadQueueRequest readQueueRequest = new ReadQueueRequest(commandParts[1]);
         System.out.println(readQueueRequest);
         clientControllerRef.sendMessage("leader", readQueueRequest);

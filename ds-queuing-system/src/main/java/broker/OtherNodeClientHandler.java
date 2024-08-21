@@ -88,6 +88,7 @@ public class OtherNodeClientHandler implements Runnable {
             }
         } catch (IOException e) {
             System.err.println("I/O Error.");
+            e.printStackTrace();
             disconnect();
         }
     }

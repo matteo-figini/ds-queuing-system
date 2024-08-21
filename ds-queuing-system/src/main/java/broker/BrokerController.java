@@ -2,8 +2,14 @@ package broker;
 
 import application.AppQueueManager;
 import application.Operation;
+import application.exceptions.NameAlreadyUsedException;
+import application.operations.CreateQueue;
+import application.operations.ReadQueue;
+import application.operations.AppendQueue;
 import messages.MessageType;
+import messages.application.*;
 import messages.network.*;
+import messages.raft.RaftAppendMessage;
 import misc.NetworkState;
 import misc.NodeReference;
 import messages.Message;
@@ -15,10 +21,8 @@ import raft.RaftNode;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.stream.Collectors;
 import java.util.List;
 
 /**
@@ -42,6 +46,15 @@ public class BrokerController {
 
     // Application stuff
     AppQueueManager queueManager = new AppQueueManager();
+
+    /**
+     * This hashmap is used to link the operation that has to be
+     * executed. This operation is evaluated by the raft network and
+     * is considered completed when the raft network commits it.
+     * Once committed, the operation id can lead to the client
+     * that requested the operation.
+     */
+    private final HashMap<Integer, String> mapOperationsClients = new HashMap<>();
 
     /**
      * Create the {@code BrokerController} instance.
@@ -97,6 +110,12 @@ public class BrokerController {
                     // Raft messages
                     eventsQueue.add(message);
                 }
+                case CREATE_QUEUE_REQUEST -> onCreateQueueRequest((CreateQueueRequest) message);
+
+                // TODO
+                case APPEND_QUEUE_REQUEST -> throw new UnsupportedOperationException("BRO NON L'HO ANCORA IMPLEMENTATO");// onAppendQueueRequest((AppendQueueRequest) message);
+                case READ_QUEUE_REQUEST -> throw new UnsupportedOperationException("BRO NON L'HO ANCORA IMPLEMENTATO");//onReadQueueRequest((ReadQueueRequest) message);
+
                 default -> System.out.println("[ERROR] Unknown message type " + message.type);
             }
         }
@@ -233,6 +252,92 @@ public class BrokerController {
      */
     public void recreateQueuesFromLog(final List<Operation> listOperations)
     {
+        // TODO: unused at the moment
         queueManager.recreateFromLog(listOperations);
+    }
+
+    private void onCreateQueueRequest(final CreateQueueRequest request)
+    {
+        // First test if the operation is valid
+        try
+        {
+            queueManager.tryCreateQueue(request.getQueueName());
+        }
+        catch (NameAlreadyUsedException e)
+        {
+            CreateQueueResponse response = new CreateQueueResponse(false, e.getMessage());
+
+            // Send response message back to the client
+            System.out.println("[INFO] Sending negative response to create queue");
+            sendMessage(request.getClientName(), response);
+        }
+
+        final Integer operationId = raftNode.getValidOperationId();
+
+        // Store the client name in the map
+        mapOperationsClients.put(operationId, request.getClientName());
+
+        final RaftAppendMessage appendMessage = new RaftAppendMessage(
+                new CreateQueue(request.getQueueName(), operationId));
+
+        eventsQueue.add(appendMessage);
+    }
+
+    /**
+     * Used by raft to signal the BrokerController that a create
+     * queue operation has been committed.
+     * A response message is sent to the client that requested
+     * such operation.
+     * @param operation The operation that was committed.
+     */
+    public void commitOperation(final Operation operation)
+    {
+        final String clientName = mapOperationsClients.get(operation.getId());
+
+        // Remove from the pending operations
+        mapOperationsClients.remove(operation.getId());
+
+        Message response;
+        switch (operation.getType())
+        {
+            case CREATE_QUEUE -> {
+                CreateQueue op = (CreateQueue)operation;
+                response = new CreateQueueResponse(true);
+
+                try { queueManager.commitCreate(op.queueName); }
+                catch (Exception e) { e.printStackTrace(); } // Cannot fail, already tested before
+            }
+            case APPEND_QUEUE -> {
+                AppendQueue op = (AppendQueue) operation;
+                response = new AppendQueueResponse(true);
+
+                try { queueManager.commitAppend(op.queueName, op.value); }
+                catch (Exception e) { e.printStackTrace(); } // Cannot fail, already tested before
+            }
+            case READ_QUEUE -> {
+                ReadQueue op = (ReadQueue) operation;
+
+                Integer value = 0;
+
+                try { value = queueManager.commitRead(op.queueName, op.readerName); }
+                catch (Exception e) { e.printStackTrace(); } // Cannot fail, already tested before
+
+                response = new ReadQueueResponse(value, true);
+            }
+            default -> throw new RuntimeException("Operation type not supported"); // Used to suppress java warnings
+        }
+
+        // TODO
+        System.out.println("[INFO] Sending positive response to the client: " + operation.toString());
+        sendMessage(clientName, response);
+    }
+
+    /**
+     * Utility used to print the queues. Called by raft after
+     * committing some messages.
+     */
+    public void printQueues()
+    {
+        queueManager.printQueues();
     }
 }

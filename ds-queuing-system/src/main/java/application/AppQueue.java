@@ -4,6 +4,7 @@ import application.exceptions.EndOfQueueException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 
 /**
  * This class represents the queue of the application.
@@ -16,6 +17,9 @@ import java.util.HashMap;
  */
 public class AppQueue {
     private final String queueName;
+
+    // TODO: maybe thread safety is unnecessary (there are no threads...?)
+    //  consider removing it to simplify code
 
     private ArrayList<Integer> queue = new ArrayList<>();
     private final Object mutexQueue = new Object();
@@ -85,7 +89,7 @@ public class AppQueue {
                 else
                 {
                     // This reader has already reached the end of the list
-                    throw new EndOfQueueException("Reached the end of the queue");
+                    throw new EndOfQueueException();
                 }
             }
 
@@ -98,12 +102,73 @@ public class AppQueue {
     }
 
     /**
+     * Used to try the operation without actually doing it. It
+     * is useful to see if some exceptions are raised or if the
+     * operation is legal.
+     * @param readerName The name of the reader.
+     * @throws EndOfQueueException Thrown if the reader would reach the end of the queue.
+     */
+    public void tryGet(final String readerName) throws EndOfQueueException
+    {
+        Integer idx = 0;
+
+        synchronized (mutexMapIndexes)
+        {
+            // Get last index if this is not the first read for the user
+            if(mapIndexes.containsKey(readerName))
+            {
+                idx = mapIndexes.get(readerName);
+            }
+            else
+            {
+                idx = 0;
+            }
+
+            // Read the value
+            synchronized (mutexQueue)
+            {
+                if(idx >= queue.size())
+                {
+                    // This reader has already reached the end of the list
+                    throw new EndOfQueueException();
+                }
+            }
+        }
+    }
+
+    /**
      * Queue name getter.
      * @return The name of the queue.
      */
     public String getName()
     {
         return queueName;
+    }
+
+    @Override public String toString()
+    {
+        synchronized (mutexMapIndexes)
+        {
+            synchronized (mutexQueue)
+            {
+                // TODO: maybe make it fancier
+
+                // Add the queue
+                String ret = queueName + ": " + queue.toString();
+                ret += "\n";
+
+                // Add the indexes of each client
+                for(String clientName : mapIndexes.keySet())
+                {
+                    Integer idx = mapIndexes.get(clientName);
+                    ret += clientName + ":" + idx + "; ";
+                }
+
+                ret += "\n-----------";
+
+                return ret;
+            }
+        }
     }
 
 }

@@ -1,9 +1,11 @@
 package raft;
+import application.Operation;
 import broker.BrokerController;
 import broker.BrokerNetwork;
 import messages.Message;
 import messages.MessageType;
 import messages.application.*;
+import messages.raft.RaftAppendMessage;
 
 import java.io.IOException;
 import java.util.*;
@@ -61,7 +63,7 @@ public class RaftNode<T> {
     private String votedFor = null;
 
     /** Log of the node*/
-    private ArrayList<LogItem<T>> log = new ArrayList<>();
+    private ArrayList<LogItem> log = new ArrayList<>();
 
     /** TODO */
     private Integer commitLength = 0;
@@ -87,7 +89,7 @@ public class RaftNode<T> {
     /**
      * Handles the backup operations on disk.
      */
-    final private LogFilesHandler<LogItem<T>> diskBackupHandler;
+    final private LogFilesHandler<LogItem> diskBackupHandler;
 
     /**
      * Reference to the queue where events are published.
@@ -98,6 +100,12 @@ public class RaftNode<T> {
      * Reference to the brokerController, used to communicate with other nodes.
      */
     private final BrokerController brokerController;
+
+    /**
+     * This is a counter used to give to the brokerController a unique value
+     * that can be used to distinguish operations.
+     */
+    private Integer operationIndex = 0;
 
     /* ---------- TIMEOUT CHECKERS ---------- */
 
@@ -196,6 +204,12 @@ public class RaftNode<T> {
             // who the current leader is
             askLeader();
         }
+
+        // Update operation id if needed
+        if(!log.isEmpty())
+        {
+            operationIndex = log.get(log.size() - 1).msg.getId() + 1;
+        }
     }
 
     /**
@@ -265,6 +279,11 @@ public class RaftNode<T> {
                         System.out.println("[INFO] Received ask leader response");
                         this.onAskLeaderResponse((AskLeaderResponse) m);
                         break;
+                    case RAFT_APPEND_MESSAGE:
+                        System.out.println("[INFO] Received add item request");
+                        final RaftAppendMessage mess = (RaftAppendMessage)m;
+                        this.onAppendMessage(mess.operation);
+                        break;
                 }
             }
             else
@@ -276,6 +295,16 @@ public class RaftNode<T> {
 
             System.out.println("[INFO] Current state: " + currentRole.name());
         }
+    }
+
+    /**
+     * Get a valid id for an operation to be added to the log.
+     * @return The unique id.
+     */
+    public synchronized Integer getValidOperationId()
+    {
+        operationIndex++;
+        return operationIndex;
     }
 
     /**
@@ -299,7 +328,7 @@ public class RaftNode<T> {
         {
             diskBackupHandler.loadLog(log);
 
-            final LogFilesHandler<LogItem<T>>.StatusStructure s = diskBackupHandler.loadStatus();
+            final LogFilesHandler<LogItem>.StatusStructure s = diskBackupHandler.loadStatus();
 
             currentTerm = s.currentTerm;
             votedFor = s.votedFor;
@@ -539,10 +568,13 @@ public class RaftNode<T> {
      * append requests to the leader. We assume that clients communicate only with the leader,
      * thus only the leader should be able to handle such requests.
      *
-     * @param newItem The Item to be added to the log.
+     * @param newOperation The operation to be added to the log.
      */
-    public void onAppendMessage(final LogItem<T> newItem)
+    public void onAppendMessage(final Operation newOperation)
     {
+        // Create new log item
+        final LogItem newItem = new LogItem(newOperation, currentTerm);
+
         // TODO: remove this check
         if(currentRole != NodeState.LEADER)
         {
@@ -582,7 +614,7 @@ public class RaftNode<T> {
 
         int prefixLen = sentLength.get(followerId);
 
-        List<LogItem<T>> suffix = new ArrayList<>(log.subList(prefixLen, log.size()));
+        List<LogItem> suffix = new ArrayList<>(log.subList(prefixLen, log.size()));
 
         int prefixTerm = 0;
         if(prefixLen > 0)
@@ -595,28 +627,6 @@ public class RaftNode<T> {
         Message msg = new LogRequest<T>(currentLeader, currentTerm, prefixLen, prefixTerm, commitLength, suffix);
         brokerController.sendMessage(followerId, msg);
     }
-
-    /**
-     * Called on the leader whenever the heartbeat notification is received.
-     */
-//    private void sendHeartbeat()
-//    {
-//        // TODO: used?
-//
-//        // Assert
-//        if(currentRole != NodeState.LEADER)
-//        {
-//            throw new RuntimeException("ERROR, sendHeartbeat() SHOULD BE CALLED ONLY ON THE LEADER");
-//        }
-//
-//        for(String followerId : nodesList)
-//        {
-//            if(!Objects.equals(followerId, nodeId)) // Don't send to myself
-//            {
-//                replicateLog(followerId);
-//            }
-//        }
-//    }
 
     /**
      * This function is used to handle log messages received from the leader. The followers
@@ -676,7 +686,7 @@ public class RaftNode<T> {
      * @param leaderCommit The number of entries committed by the leader.
      * @param suffix The list containing the entries to be added.
      */
-    private void appendEntries(Integer prefixLen, Integer leaderCommit, List<LogItem<T>> suffix)
+    private void appendEntries(Integer prefixLen, Integer leaderCommit, List<LogItem> suffix)
     {
         // TODO: this function should be called only by followers?
         //  Should I add an assertion for testing?
@@ -766,6 +776,7 @@ public class RaftNode<T> {
         // Note: the code of this function was taken from the video, not from the pdf
 
         boolean keepGoing = true;
+        boolean newMessaggesCommitted = false;
 
         while(commitLength < log.size() && keepGoing)
         {
@@ -784,12 +795,26 @@ public class RaftNode<T> {
                 // TODO: is this enough? It should be for now, at least for testing.
                 //  Also check if this is equivalent with what is done inside appendEntries()
                 System.out.println("[INFO] New log entry committed from commitLogEntries(): " + log.get(commitLength).msg);
+
+                // TODO: this operation is heavy, should it be performed
+                //  by the raft thread or by the brokerController thread?
+                brokerController.commitOperation(log.get(commitLength).msg);
+
                 commitLength++;
+
+                newMessaggesCommitted = true;
             }
             else
             {
                 keepGoing = false;
             }
+        }
+
+        if(newMessaggesCommitted)
+        {
+            // TODO: this operation is heavy, should it be performed
+            //  by the raft thread or by the brokerController thread?
+            brokerController.printQueues();
         }
     }
 }

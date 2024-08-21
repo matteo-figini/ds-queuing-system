@@ -9,14 +9,17 @@ import messages.MessageType;
  */
 public class CreateQueueRequest extends Message {
     private final String queueName;       // Name of the new queue
+    private final String clientName;
 
     /**
      * Create a new message of type {@code CreateQueueRequest}.
      * @param queueName Name of the new queue.
+     * @param clientName Name of the client requesting the operation.
      */
-    public CreateQueueRequest(String queueName) {
+    public CreateQueueRequest(String queueName, String clientName) {
         super(MessageType.CREATE_QUEUE_REQUEST);
         this.queueName = queueName;
+        this.clientName = clientName;
     }
 
     /**
@@ -25,6 +28,8 @@ public class CreateQueueRequest extends Message {
     public String getQueueName() {
         return queueName;
     }
+
+    public String getClientName() { return clientName; }
 
     @Override
     public String toString() {
