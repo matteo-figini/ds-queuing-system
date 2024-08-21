@@ -98,6 +98,11 @@ public class AppQueueManager {
         }
     }
 
+    /**
+     * Utility used to wrap the "try-catch" needed for the
+     * recreateFromLog() function.
+     * @param op The operation to be recreated.
+     */
     private void recreateRead(ReadQueue op)
     {
         try
@@ -111,6 +116,11 @@ public class AppQueueManager {
         }
     }
 
+    /**
+     * Utility used to wrap the "try-catch" needed for the
+     * recreateFromLog() function.
+     * @param op The operation to be recreated.
+     */
     private void recreateWrite(AppendQueue op)
     {
         try
@@ -124,6 +134,11 @@ public class AppQueueManager {
         }
     }
 
+    /**
+     * Utility used to wrap the "try-catch" needed for the
+     * recreateFromLog() function.
+     * @param op The operation to be recreated.
+     */
     private void recreateCreate(CreateQueue op)
     {
         try
@@ -137,6 +152,13 @@ public class AppQueueManager {
         }
     }
 
+    /**
+     * Utility to check if an operation is valid, without actually
+     * performing it.
+     *
+     * @param queueName The name of the queue to be created.
+     * @throws NameAlreadyUsedException Thrown if there is already a queue with such name.
+     */
     public void tryCreateQueue(final String queueName) throws NameAlreadyUsedException
     {
         if(mapQueues.containsKey(queueName))
@@ -145,6 +167,15 @@ public class AppQueueManager {
         }
     }
 
+    /**
+     * Utility to check if an operation is valid, without actually
+     * performing it.
+     *
+     * @param queueName The name of the queue.
+     * @param readerName The name of the reader.
+     * @throws QueueNotFoundException Thrown if there's no queue with such name.
+     * @throws EndOfQueueException Thrown if the reader has already reached the end of the queue.
+     */
     public void tryReadQueue(final String queueName, final String readerName) throws QueueNotFoundException, EndOfQueueException
     {
         if(!mapQueues.containsKey(queueName))
@@ -155,6 +186,24 @@ public class AppQueueManager {
         mapQueues.get(queueName).tryGet(readerName);
     }
 
+    /**
+     * Utility to check if an operation is valid, without actually
+     * performing it.
+     *
+     * @param queueName The name of the queue.
+     * @throws QueueNotFoundException Thrown if there's no queue with such name.
+     */
+    public void tryAppendQueue(final String queueName) throws QueueNotFoundException
+    {
+        if(!mapQueues.containsKey(queueName))
+        {
+            throw new QueueNotFoundException();
+        }
+    }
+
+    /**
+     * Utility for showing the state of the queues.
+     */
     public void printQueues()
     {
         System.out.println("- Queues: ---------");

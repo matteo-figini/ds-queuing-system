@@ -14,16 +14,19 @@ import java.util.List;
 public class AppendQueueRequest extends Message {
     private final String queueName;
     private final List<Integer> appendElements;
+    private final String clientName;
 
     /**
      * Create a new message of type {@code AppendQueueRequest}.
+     * @param clientName The name of the client requesting the operation.
      * @param queueName Name of the queue to which append the new data.
      * @param newElements List of the elements that will be appended to the queue.
      */
-    public AppendQueueRequest(String queueName, List<Integer> newElements) {
+    public AppendQueueRequest(String clientName, String queueName, List<Integer> newElements) {
         super(MessageType.APPEND_QUEUE_REQUEST);
         this.queueName = queueName;
         this.appendElements = new ArrayList<>(newElements);
+        this.clientName = clientName;
     }
 
     /**
@@ -39,6 +42,11 @@ public class AppendQueueRequest extends Message {
     public List<Integer> getAppendElements() {
         return appendElements;
     }
+
+    /**
+     * @return The name of the client requesting the operation.
+     */
+    public String getClientName() { return clientName; }
 
     @Override
     public String toString() {

@@ -138,6 +138,9 @@ public class ClientController {
                 1, TimeUnit.SECONDS);
     }
 
+    /**
+     * Utility used to ask the client to insert a command.
+     */
     private void askCommand()
     {
         Scanner s = new Scanner(System.in);

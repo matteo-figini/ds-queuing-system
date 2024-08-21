@@ -2,7 +2,9 @@ package broker;
 
 import application.AppQueueManager;
 import application.Operation;
+import application.exceptions.EndOfQueueException;
 import application.exceptions.NameAlreadyUsedException;
+import application.exceptions.QueueNotFoundException;
 import application.operations.CreateQueue;
 import application.operations.ReadQueue;
 import application.operations.AppendQueue;
@@ -110,11 +112,10 @@ public class BrokerController {
                     // Raft messages
                     eventsQueue.add(message);
                 }
-                case CREATE_QUEUE_REQUEST -> onCreateQueueRequest((CreateQueueRequest) message);
 
-                // TODO
-                case APPEND_QUEUE_REQUEST -> throw new UnsupportedOperationException("BRO NON L'HO ANCORA IMPLEMENTATO");// onAppendQueueRequest((AppendQueueRequest) message);
-                case READ_QUEUE_REQUEST -> throw new UnsupportedOperationException("BRO NON L'HO ANCORA IMPLEMENTATO");//onReadQueueRequest((ReadQueueRequest) message);
+                case CREATE_QUEUE_REQUEST -> onCreateQueueRequest((CreateQueueRequest) message);
+                case APPEND_QUEUE_REQUEST -> onAppendQueueRequest((AppendQueueRequest) message);
+                case READ_QUEUE_REQUEST -> onReadQueueRequest((ReadQueueRequest) message);
 
                 default -> System.out.println("[ERROR] Unknown message type " + message.type);
             }
@@ -256,6 +257,13 @@ public class BrokerController {
         queueManager.recreateFromLog(listOperations);
     }
 
+    /**
+     * Handle the create queue request from a client. Sends immediately a
+     * reply to the client in case the request is not valid. Otherwise, it
+     * sends the request to the raft network to be processed.
+     *
+     * @param request The request from the client.
+     */
     private void onCreateQueueRequest(final CreateQueueRequest request)
     {
         // First test if the operation is valid
@@ -270,6 +278,7 @@ public class BrokerController {
             // Send response message back to the client
             System.out.println("[INFO] Sending negative response to create queue");
             sendMessage(request.getClientName(), response);
+            return;
         }
 
         final Integer operationId = raftNode.getValidOperationId();
@@ -279,6 +288,79 @@ public class BrokerController {
 
         final RaftAppendMessage appendMessage = new RaftAppendMessage(
                 new CreateQueue(request.getQueueName(), operationId));
+
+        eventsQueue.add(appendMessage);
+    }
+
+    /**
+     * Handle the append queue request from a client. Sends immediately a
+     * reply to the client in case the request is not valid. Otherwise, it
+     * sends the request to the raft network to be processed.
+     *
+     * @param request The request from the client.
+     */
+    private void onAppendQueueRequest(final AppendQueueRequest request)
+    {
+        // First test if the operation is valid
+        try
+        {
+            queueManager.tryAppendQueue(request.getQueueName());
+        }
+        catch (QueueNotFoundException e)
+        {
+            final AppendQueueResponse response = new AppendQueueResponse(false, e.getMessage());
+
+            // Send response message back to the client
+            System.out.println("[INFO] Sending negative response to append queue request");
+            sendMessage(request.getClientName(), response);
+            return;
+        }
+
+        final Integer operationId = raftNode.getValidOperationId();
+
+        // Store the client name in the map
+        mapOperationsClients.put(operationId, request.getClientName());
+
+        // TODO: raft currently supports only APPEND WITH 1 VALUE, while the
+        //  client commands interpreter and the AppendQueueRequest takes multiple
+        //  values. Decide which way to go, for now only the first value is taken,
+        //  following raft's convention.
+        final RaftAppendMessage appendMessage = new RaftAppendMessage(
+                new AppendQueue(request.getQueueName(), request.getAppendElements().get(0), operationId));
+
+        eventsQueue.add(appendMessage);
+    }
+
+    /**
+     * Handle the read queue request from a client. Sends immediately a
+     * reply to the client in case the request is not valid. Otherwise, it
+     * sends the request to the raft network to be processed.
+     *
+     * @param request The request from the client.
+     */
+    private void onReadQueueRequest(final ReadQueueRequest request)
+    {
+        try
+        {
+            queueManager.tryReadQueue(request.getQueueName(), request.getClientName());
+        }
+        catch (QueueNotFoundException | EndOfQueueException e)
+        {
+            final ReadQueueResponse response = new ReadQueueResponse(0, false, e.getMessage());
+
+            // Send response message back to the client
+            System.out.println("[INFO] Sending negative response to read queue request");
+            sendMessage(request.getClientName(), response);
+            return;
+        }
+
+        final Integer operationId = raftNode.getValidOperationId();
+
+        // Store the client name in the map
+        mapOperationsClients.put(operationId, request.getClientName());
+
+        final RaftAppendMessage appendMessage = new RaftAppendMessage(
+                new ReadQueue(request.getClientName(), request.getQueueName(), operationId));
 
         eventsQueue.add(appendMessage);
     }

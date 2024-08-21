@@ -29,6 +29,9 @@ public class CreateQueueRequest extends Message {
         return queueName;
     }
 
+    /**
+     * @return The name of the client requesting the operation.
+     */
     public String getClientName() { return clientName; }
 
     @Override

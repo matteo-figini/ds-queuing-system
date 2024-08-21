@@ -10,6 +10,7 @@ import messages.raft.RaftAppendMessage;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 
 /**
  * This class defines the logic of a Raft node.
@@ -208,7 +209,7 @@ public class RaftNode<T> {
         // Update operation id if needed
         if(!log.isEmpty())
         {
-            operationIndex = log.get(log.size() - 1).msg.getId() + 1;
+            operationIndex = log.get(log.size() - 1).operation.getId() + 1;
         }
     }
 
@@ -333,11 +334,18 @@ public class RaftNode<T> {
             currentTerm = s.currentTerm;
             votedFor = s.votedFor;
             commitLength = s.commitLength;
+
+            // Recreate the queues from the log
+            final List<Operation> listOperations = log.stream()
+                            .map(item -> item.operation)
+                            .toList(); // Get the list of operations
+            brokerController.recreateQueuesFromLog(listOperations);
         }
         catch (IOException e)
         {
             // TODO: improve?
             System.out.println(e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -720,7 +728,7 @@ public class RaftNode<T> {
                 // deliver log[i].msg to the application
                 // TODO: is this enough? It should be for now, at least for testing
                 //  Also check if this is equivalent with what is done inside commitLogEntries()
-                System.out.println("[INFO] New log entry committed from appendEntries(): " + log.get(i).msg);
+                System.out.println("[INFO] New log entry committed from appendEntries(): " + log.get(i).operation);
             }
 
             commitLength = leaderCommit;
@@ -794,11 +802,11 @@ public class RaftNode<T> {
                 // deliver log[commitLength].msg to the application
                 // TODO: is this enough? It should be for now, at least for testing.
                 //  Also check if this is equivalent with what is done inside appendEntries()
-                System.out.println("[INFO] New log entry committed from commitLogEntries(): " + log.get(commitLength).msg);
+                System.out.println("[INFO] New log entry committed from commitLogEntries(): " + log.get(commitLength).operation);
 
                 // TODO: this operation is heavy, should it be performed
                 //  by the raft thread or by the brokerController thread?
-                brokerController.commitOperation(log.get(commitLength).msg);
+                brokerController.commitOperation(log.get(commitLength).operation);
 
                 commitLength++;
 

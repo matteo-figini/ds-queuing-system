@@ -10,11 +10,11 @@ import java.io.Serializable;
 public class LogItem implements Serializable {
     public final Integer term;
 
-    public final Operation msg;
+    public final Operation operation;
 
-    LogItem(final Operation msg, final Integer term)
+    public LogItem(final Operation op, final Integer term)
     {
-        this.msg = msg;
+        this.operation = op;
         this.term = term;
     }
 }

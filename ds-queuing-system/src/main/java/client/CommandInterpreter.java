@@ -63,8 +63,7 @@ public class CommandInterpreter {
     private void interpretAppendCommand (String[] commandParts) {
         if (commandParts.length < 2) return;
         List<Integer> elementsToAppend = IntStream.range(2, commandParts.length).mapToObj(i -> Integer.parseInt(commandParts[i])).collect(Collectors.toList());
-        // TODO: add client name
-        AppendQueueRequest appendQueueRequest = new AppendQueueRequest(commandParts[1], elementsToAppend);
+        AppendQueueRequest appendQueueRequest = new AppendQueueRequest(clientName, commandParts[1], elementsToAppend);
         System.out.println(appendQueueRequest);
         clientControllerRef.sendMessage("leader", appendQueueRequest);
     }
@@ -77,8 +76,7 @@ public class CommandInterpreter {
      */
     private void interpretReadCommand (String[] commandParts) {
         if (commandParts.length < 2) return;
-        // TODO: add client name
-        ReadQueueRequest readQueueRequest = new ReadQueueRequest(commandParts[1]);
+        ReadQueueRequest readQueueRequest = new ReadQueueRequest(commandParts[1], clientName);
         System.out.println(readQueueRequest);
         clientControllerRef.sendMessage("leader", readQueueRequest);
     }
