@@ -7,9 +7,9 @@ public class AppendQueue extends Operation {
     public final String queueName;
     public final Integer value;
 
-    public AppendQueue(final String queueName, final Integer value, final Integer operationId)
+    public AppendQueue(final String queueName, final Integer value, final String clientName)
     {
-        super(OperationType.APPEND_QUEUE, operationId);
+        super(OperationType.APPEND_QUEUE, clientName);
 
         this.queueName = queueName;
         this.value = value;

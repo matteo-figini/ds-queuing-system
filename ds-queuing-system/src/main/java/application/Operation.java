@@ -7,12 +7,12 @@ import java.io.Serializable;
  */
 public class Operation implements Serializable {
     private final OperationType type;
-    private final Integer id;
+    private final String clientName;
 
-    public Operation(final OperationType type, final Integer id)
+    public Operation(final OperationType type, final String clientName)
     {
         this.type = type;
-        this.id = id;
+        this.clientName = clientName;
     }
 
     public OperationType getType()
@@ -20,10 +20,11 @@ public class Operation implements Serializable {
         return type;
     }
 
-    public Integer getId() { return id; }
+    public String getClientName() { return clientName; }
 
     public String toString()
     {
-        return "type:" + type.name() + "; id:" + id.toString();
+//        return "type:" + type.name() + "; id:" + id.toString();
+        return "type:" + type.name() + "; client:" + clientName;
     }
 }

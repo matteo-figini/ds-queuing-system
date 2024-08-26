@@ -24,6 +24,7 @@ import raft.RaftNode;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.List;
 
@@ -48,15 +49,6 @@ public class BrokerController {
 
     // Application stuff
     AppQueueManager queueManager = new AppQueueManager();
-
-    /**
-     * This hashmap is used to link the operation that has to be
-     * executed. This operation is evaluated by the raft network and
-     * is considered completed when the raft network commits it.
-     * Once committed, the operation id can lead to the client
-     * that requested the operation.
-     */
-    private final HashMap<Integer, String> mapOperationsClients = new HashMap<>();
 
     /**
      * Create the {@code BrokerController} instance.
@@ -311,31 +303,24 @@ public class BrokerController {
         }
 
         // The request is valid, send it to raft to be processed
-
-        // Get an id for the operation
-        final Integer operationId = raftNode.getValidOperationId();
-
-        // Store the client name in the map
-        mapOperationsClients.put(operationId, clientName);
-
-        eventsQueue.add(createRaftAppendMessage(request, operationId));
+        eventsQueue.add(createRaftAppendMessage(request, clientName));
     }
 
     /**
      * Utility used to create a RaftAppendMessage from a VALID client request.
      *
      * @param request The request from the client. Must be a valid one, not checked here.
-     * @param operationId The id for the operation to be created.
+     * @param clientName The name of the client requesting the operation.
      * @return The RaftAppendMessage to be sent to raft.
      */
-    private RaftAppendMessage createRaftAppendMessage(final Message request, final Integer operationId)
+    private RaftAppendMessage createRaftAppendMessage(final Message request, final String clientName)
     {
         final RaftAppendMessage appendMessage;
         switch (request.type)
         {
             case CREATE_QUEUE_REQUEST -> {
                 final CreateQueueRequest r = (CreateQueueRequest) request;
-                appendMessage = new RaftAppendMessage(new CreateQueue(r.getQueueName(), operationId));
+                appendMessage = new RaftAppendMessage(new CreateQueue(r.getQueueName(), clientName));
             }
             case APPEND_QUEUE_REQUEST -> {
                 final AppendQueueRequest r = (AppendQueueRequest) request;
@@ -343,11 +328,11 @@ public class BrokerController {
                 //  client commands interpreter and the AppendQueueRequest takes multiple
                 //  values. Decide which way to go, for now only the first value is taken,
                 //  following raft's convention.
-                appendMessage = new RaftAppendMessage(new AppendQueue(r.getQueueName(), r.getAppendElements().get(0), operationId));
+                appendMessage = new RaftAppendMessage(new AppendQueue(r.getQueueName(), r.getAppendElements().get(0), clientName));
             }
             case READ_QUEUE_REQUEST -> {
                 final ReadQueueRequest r = (ReadQueueRequest) request;
-                appendMessage = new RaftAppendMessage(new ReadQueue(r.getClientName(), r.getQueueName(), operationId));
+                appendMessage = new RaftAppendMessage(new ReadQueue(r.getClientName(), r.getQueueName(), clientName));
             }
             default -> throw new RuntimeException("Message type not supported by createRaftAppendMessage()");
         }
@@ -356,18 +341,62 @@ public class BrokerController {
     }
 
     /**
-     * Used by raft to signal the BrokerController that a create
-     * queue operation has been committed.
+     * Used by raft to signal the BrokerController that an
+     * operation has been committed.
      * A response message is sent to the client that requested
      * such operation.
+     * THIS FUNCTION SHOULD BE INVOKED ONLY BY THE FOLLOWERS
+     * OF THE NETWORK.
+     *
      * @param operation The operation that was committed.
      */
-    public void commitOperation(final Operation operation)
+    public void commitOperationFollower(final Operation operation)
     {
-        final String clientName = mapOperationsClients.get(operation.getId());
+        if(Objects.equals(leaderBroker, brokerName))
+        {
+            throw new RuntimeException("This function should be called only by a follower");
+        }
+
+        switch (operation.getType())
+        {
+            case READ_QUEUE -> {
+                final ReadQueue op = (ReadQueue) operation;
+                try { queueManager.commitRead(op.queueName, op.readerName); }
+                catch (Exception e) { e.printStackTrace(); } // It shouldn't fail, it should be tested before
+            }
+            case APPEND_QUEUE -> {
+                final AppendQueue op = (AppendQueue) operation;
+                try { queueManager.commitAppend(op.queueName, op.value); }
+                catch (Exception e) { e.printStackTrace(); } // It shouldn't fail, it should be tested before
+            }
+            case CREATE_QUEUE -> {
+                final CreateQueue op = (CreateQueue) operation;
+                try { queueManager.commitCreate(op.queueName); }
+                catch (Exception e) { e.printStackTrace(); } // It shouldn't fail, it should be tested before
+            }
+        }
+    }
+
+    /**
+     * Used by raft to signal the BrokerController that an
+     * operation has been committed.
+     * A response message is sent to the client that requested
+     * such operation.
+     * THIS FUNCTION SHOULD BE INVOKED ONLY BY THE CURRENT
+     * LEADER OF THE NETWORK.
+     *
+     * @param operation The operation that was committed.
+     */
+    public void commitOperationLeader(final Operation operation)
+    {
+        if(!Objects.equals(leaderBroker, brokerName))
+        {
+            throw new RuntimeException("This function should be invoked only by the leader of the network");
+        }
+
+        final String clientName = operation.getClientName();
 
         // Remove from the pending operations
-        mapOperationsClients.remove(operation.getId());
 
         Message response;
         switch (operation.getType())

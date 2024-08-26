@@ -10,7 +10,6 @@ import messages.raft.RaftAppendMessage;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.stream.Collectors;
 
 /**
  * This class defines the logic of a Raft node.
@@ -205,12 +204,6 @@ public class RaftNode<T> {
             // who the current leader is
             askLeader();
         }
-
-        // Update operation id if needed
-        if(!log.isEmpty())
-        {
-            operationIndex = log.get(log.size() - 1).operation.getId() + 1;
-        }
     }
 
     /**
@@ -296,16 +289,6 @@ public class RaftNode<T> {
 
             System.out.println("[INFO] Current state: " + currentRole.name());
         }
-    }
-
-    /**
-     * Get a valid id for an operation to be added to the log.
-     * @return The unique id.
-     */
-    public synchronized Integer getValidOperationId()
-    {
-        operationIndex++;
-        return operationIndex;
     }
 
     /**
@@ -553,6 +536,8 @@ public class RaftNode<T> {
                 }
 
                 brokerController.notifyLocatorImLeader();
+
+                brokerController.printQueues();
             }
         }
         else if(term > currentTerm)
@@ -729,6 +714,10 @@ public class RaftNode<T> {
                 // TODO: is this enough? It should be for now, at least for testing
                 //  Also check if this is equivalent with what is done inside commitLogEntries()
                 System.out.println("[INFO] New log entry committed from appendEntries(): " + log.get(i).operation);
+
+                // TODO: this operation is heavy, should it be performed
+                //  by the raft thread or by the brokerController thread?
+                brokerController.commitOperationFollower(log.get(i).operation);
             }
 
             commitLength = leaderCommit;
@@ -781,8 +770,6 @@ public class RaftNode<T> {
      */
     private void commitLogEntries()
     {
-        // Note: the code of this function was taken from the video, not from the pdf
-
         boolean keepGoing = true;
         boolean newMessaggesCommitted = false;
 
@@ -806,7 +793,7 @@ public class RaftNode<T> {
 
                 // TODO: this operation is heavy, should it be performed
                 //  by the raft thread or by the brokerController thread?
-                brokerController.commitOperation(log.get(commitLength).operation);
+                brokerController.commitOperationLeader(log.get(commitLength).operation);
 
                 commitLength++;
 
@@ -823,6 +810,14 @@ public class RaftNode<T> {
             // TODO: this operation is heavy, should it be performed
             //  by the raft thread or by the brokerController thread?
             brokerController.printQueues();
+
+            for(String followerId : nodesConnected)
+            {
+                if(!Objects.equals(followerId, nodeId))
+                {
+                    replicateLog(followerId);
+                }
+            }
         }
     }
 }
