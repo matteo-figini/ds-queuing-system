@@ -4,7 +4,6 @@ import application.exceptions.EndOfQueueException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 
 /**
  * This class represents the queue of the application.
@@ -18,14 +17,9 @@ import java.util.Iterator;
 public class AppQueue {
     private final String queueName;
 
-    // TODO: maybe thread safety is unnecessary (there are no threads...?)
-    //  consider removing it to simplify code
-
     private ArrayList<Integer> queue = new ArrayList<>();
-    private final Object mutexQueue = new Object();
 
     private HashMap<String, Integer> mapIndexes = new HashMap<>();
-    private final Object mutexMapIndexes = new Object();
 
     /**
      * Construct an empty queue.
@@ -42,10 +36,7 @@ public class AppQueue {
      */
     public void add(final Integer value)
     {
-        synchronized (mutexQueue)
-        {
-            queue.add(value);
-        }
+        queue.add(value);
     }
 
     /**
@@ -58,45 +49,25 @@ public class AppQueue {
      */
     public Integer get(final String readerName) throws EndOfQueueException
     {
-        // TODO: this function could probably be improved by using
-        //  ReentrantReadWriteLock to grant access. This is the safest
-        //  and simplest implementation.
-
-        Integer idx = 0;
         Integer retValue = 0;
 
-        synchronized (mutexMapIndexes)
+        // Get last index if this is not the first read for the user
+        Integer idx = mapIndexes.getOrDefault(readerName, 0);
+
+        // Read the value
+        if(idx < queue.size())
         {
-            // Get last index if this is not the first read for the user
-            if(mapIndexes.containsKey(readerName))
-            {
-                idx = mapIndexes.get(readerName);
-            }
-            else
-            {
-                idx = 0;
-            }
-
-
-            // Read the value
-            synchronized (mutexQueue)
-            {
-                if(idx < queue.size())
-                {
-                    retValue = queue.get(idx);
-                    idx++;
-                }
-                else
-                {
-                    // This reader has already reached the end of the list
-                    throw new EndOfQueueException();
-                }
-            }
-
-
-            // Update the iterators list
-            mapIndexes.put(readerName, idx);
+            retValue = queue.get(idx);
+            idx++;
         }
+        else
+        {
+            // This reader has already reached the end of the list
+            throw new EndOfQueueException();
+        }
+
+        // Update the iterators list
+        mapIndexes.put(readerName, idx);
 
         return retValue;
     }
@@ -110,29 +81,14 @@ public class AppQueue {
      */
     public void tryGet(final String readerName) throws EndOfQueueException
     {
-        Integer idx = 0;
+        // Get last index if this is not the first read for the user
+        final Integer idx = mapIndexes.getOrDefault(readerName, 0);
 
-        synchronized (mutexMapIndexes)
+        // Read the value
+        if(idx >= queue.size())
         {
-            // Get last index if this is not the first read for the user
-            if(mapIndexes.containsKey(readerName))
-            {
-                idx = mapIndexes.get(readerName);
-            }
-            else
-            {
-                idx = 0;
-            }
-
-            // Read the value
-            synchronized (mutexQueue)
-            {
-                if(idx >= queue.size())
-                {
-                    // This reader has already reached the end of the list
-                    throw new EndOfQueueException();
-                }
-            }
+            // This reader has already reached the end of the list
+            throw new EndOfQueueException();
         }
     }
 
@@ -147,28 +103,22 @@ public class AppQueue {
 
     @Override public String toString()
     {
-        synchronized (mutexMapIndexes)
+        // TODO: maybe make it fancier
+
+        // Add the queue
+        String ret = queueName + ": " + queue.toString();
+        ret += "\n";
+
+        // Add the indexes of each client
+        for(String clientName : mapIndexes.keySet())
         {
-            synchronized (mutexQueue)
-            {
-                // TODO: maybe make it fancier
-
-                // Add the queue
-                String ret = queueName + ": " + queue.toString();
-                ret += "\n";
-
-                // Add the indexes of each client
-                for(String clientName : mapIndexes.keySet())
-                {
-                    Integer idx = mapIndexes.get(clientName);
-                    ret += clientName + ":" + idx + "; ";
-                }
-
-                ret += "\n-----------";
-
-                return ret;
-            }
+            Integer idx = mapIndexes.get(clientName);
+            ret += clientName + ":" + idx + "; ";
         }
+
+        ret += "\n-----------";
+
+        return ret;
     }
 
 }
