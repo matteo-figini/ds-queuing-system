@@ -87,63 +87,37 @@ public class AppQueueManager {
         Iterator<Operation> it = listOperations.iterator();
         while(it.hasNext())
         {
-            Operation op = it.next();
+            final Operation op = it.next();
+            recreateOperation(op);
+        }
+    }
 
-            switch (op.getType())
+    /**
+     * Utility used to wrap the "try-catch" needed for the
+     * recreateFromLog() function.
+     *
+     * @param operation The operation to be recreated.
+     * @throws RuntimeException Thrown if the operation is invalid.
+     */
+    private void recreateOperation(final Operation operation)
+    {
+        try
+        {
+            switch (operation.getType())
             {
-                case READ_QUEUE -> recreateRead((ReadQueue) op);
-                case APPEND_QUEUE -> recreateWrite((AppendQueue) op);
-                case CREATE_QUEUE -> recreateCreate((CreateQueue) op);
+                case READ_QUEUE -> {
+                    final ReadQueue op = (ReadQueue) operation;
+                    commitRead(op.queueName, op.readerName);
+                }
+                case APPEND_QUEUE -> {
+                    final AppendQueue op = (AppendQueue) operation;
+                    commitAppend(op.queueName, op.value);
+                }
+                case CREATE_QUEUE -> {
+                    final CreateQueue op = (CreateQueue) operation;
+                    commitCreate(op.queueName);
+                }
             }
-        }
-    }
-
-    /**
-     * Utility used to wrap the "try-catch" needed for the
-     * recreateFromLog() function.
-     * @param op The operation to be recreated.
-     */
-    private void recreateRead(ReadQueue op)
-    {
-        try
-        {
-            commitRead(op.queueName, op.readerName);
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-            throw new RuntimeException("The log is faulty, exception while recreating queues");
-        }
-    }
-
-    /**
-     * Utility used to wrap the "try-catch" needed for the
-     * recreateFromLog() function.
-     * @param op The operation to be recreated.
-     */
-    private void recreateWrite(AppendQueue op)
-    {
-        try
-        {
-            commitAppend(op.queueName, op.value);
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-            throw new RuntimeException("The log is faulty, exception while recreating queues");
-        }
-    }
-
-    /**
-     * Utility used to wrap the "try-catch" needed for the
-     * recreateFromLog() function.
-     * @param op The operation to be recreated.
-     */
-    private void recreateCreate(CreateQueue op)
-    {
-        try
-        {
-            commitCreate(op.queueName);
         }
         catch (Exception e)
         {
