@@ -1,6 +1,7 @@
 package client;
 
 import messages.Message;
+import messages.network.HelloRequestMessage;
 import misc.NodeReference;
 import java.io.IOException;
 
@@ -28,13 +29,14 @@ public class ClientNetwork {
      * If the client was already connected to a leader, flush and reset the previous connection.
      * @param leaderReference Reference of the broker's leader.
      */
-    public void connectToBrokerLeader (NodeReference leaderReference) {
+    public void connectToBrokerLeader (NodeReference leaderReference, HelloRequestMessage helloMessage) {
         if (leaderReference.isBroker()) {
             flushLeaderConnection();
             try {
                 this.leaderSocket = new LeaderSocket(leaderReference.nodeName(),
                         leaderReference.ipAddress(), leaderReference.publicPort(), this);
                 System.out.println("[INFO] Connected to the leader: " + leaderReference.nodeName() + ".");
+                sendMessage("leader", helloMessage);
             } catch (IOException e) {
                 System.out.println("[EXCEPTION] Cannot connect to the leader " + leaderReference.nodeName() + ": " + e.getMessage());
             }

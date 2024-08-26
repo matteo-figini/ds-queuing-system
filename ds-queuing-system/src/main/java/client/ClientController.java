@@ -23,6 +23,8 @@ public class ClientController {
     private final ExecutorService keyboardInputRoutine = Executors.newSingleThreadExecutor();
     private CommandInterpreter commandInterpreter;
 
+    private String localIPAddress;
+
     /**
      * Create the instance of {@code ClientController}.
      * @param clientName Name of the client.
@@ -46,11 +48,10 @@ public class ClientController {
      * Start the communication flow with the locator by sending the {@code HelloRequestMessage}.
      */
     public void startCommunicationGreetings () {
-        String localIPAddress;
         try {
-            localIPAddress = Inet4Address.getLocalHost().getHostAddress();
+            this.localIPAddress = Inet4Address.getLocalHost().getHostAddress();
         } catch (UnknownHostException e) {
-            localIPAddress = "127.0.0.1";
+            this.localIPAddress = "127.0.0.1";
             System.out.println("[EXCEPTION] Unable to retrieve the local IP address: " + e.getMessage());
             System.out.println("[EXCEPTION] Adding the default address: " + localIPAddress);
         }
@@ -63,7 +64,7 @@ public class ClientController {
             }
         });
         // Field "nodePublicPort" is not relevant
-        HelloRequestMessage helloMessage = new HelloRequestMessage(localIPAddress, 0, clientName, false);
+        HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, 0, clientName, false);
         clientNetwork.sendMessage("locator", helloMessage);
     }
 
@@ -122,8 +123,8 @@ public class ClientController {
             retrySendingMessage.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()), waitingSeconds, TimeUnit.SECONDS);
         } else {
             System.out.println("[INFO] Setting available leader: " + message.getLeaderReference().nodeName());
-            clientNetwork.connectToBrokerLeader(message.getLeaderReference());
-
+            HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, 0, clientName, false);
+            clientNetwork.connectToBrokerLeader(message.getLeaderReference(), helloMessage);
             askCommand();
         }
     }
