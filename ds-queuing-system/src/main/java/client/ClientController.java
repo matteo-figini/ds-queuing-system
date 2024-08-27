@@ -125,7 +125,6 @@ public class ClientController {
             System.out.println("[INFO] Setting available leader: " + message.getLeaderReference().nodeName());
             HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, 0, clientName, false);
             clientNetwork.connectToBrokerLeader(message.getLeaderReference(), helloMessage);
-            askCommand();
         }
     }
 
@@ -139,19 +138,6 @@ public class ClientController {
                 1, TimeUnit.SECONDS);
     }
 
-    /**
-     * Utility used to ask the client to insert a command.
-     */
-    private void askCommand()
-    {
-        Scanner s = new Scanner(System.in);
-        System.out.print("> Insert command: ");
-        String command = s.nextLine();
-        System.out.println("Command inserted: " + command);
-
-        commandInterpreter.interpretAndSendCommand(command);
-    }
-
     private void onCreateQueueResponse(final CreateQueueResponse response)
     {
         if(response.getStatus())
@@ -163,8 +149,6 @@ public class ClientController {
             System.out.println("[ERROR] An error occurred while attempting to create the queue: " +
                     response.getInfoMessage());
         }
-
-        askCommand();
     }
 
     private void onAppendQueueResponse(final AppendQueueResponse response)
@@ -178,8 +162,6 @@ public class ClientController {
             System.out.println("[ERROR] An error occurred while attempting to append to the queue: " +
                     response.getInfoMessage());
         }
-
-        askCommand();
     }
 
     private void onReadQueueResponse(final ReadQueueResponse response)
@@ -193,7 +175,5 @@ public class ClientController {
             System.out.println("[ERROR] An error occurred while attempting to read from the queue: " +
                     response.getInfoMessage());
         }
-
-        askCommand();
     }
 }

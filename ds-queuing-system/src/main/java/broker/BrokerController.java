@@ -23,10 +23,8 @@ import raft.RaftNode;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
-import java.util.HashMap;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.List;
 
 /**
  * This class represents the main element of a broker, managing all the underlying logic
@@ -43,7 +41,7 @@ public class BrokerController {
     private String leaderBroker;
 
     // Raft stuff
-    private RaftNode<Operation> raftNode;
+    private RaftNode raftNode;
     Thread raftThread;
     private LinkedBlockingQueue<Message> eventsQueue = new LinkedBlockingQueue<>();
 
@@ -162,7 +160,7 @@ public class BrokerController {
         System.out.println("Raft ready to start");
 
         // Start raft node
-        raftNode = new RaftNode<>(brokerName, nodesConnected.keySet(), eventsQueue, this, networkAlreadyStarted);
+        raftNode = new RaftNode(brokerName, eventsQueue, this, networkAlreadyStarted);
         raftThread = new Thread() {
             public void run() {
                 raftNode.waitForEvents();
@@ -242,7 +240,6 @@ public class BrokerController {
      */
     public void recreateQueuesFromLog(final List<Operation> listOperations)
     {
-        // TODO: unused at the moment
         queueManager.recreateFromLog(listOperations);
     }
 
@@ -396,7 +393,7 @@ public class BrokerController {
 
         final String clientName = operation.getClientName();
 
-        // Remove from the pending operations
+        // Send response to the client requesting the operation
 
         Message response;
         switch (operation.getType())
@@ -428,9 +425,49 @@ public class BrokerController {
             default -> throw new RuntimeException("Operation type not supported"); // Used to suppress java warnings
         }
 
-        // TODO
         System.out.println("[INFO] Sending positive response to the client: " + operation.toString());
         sendMessage(clientName, response);
+    }
+
+    /**
+     * Get the list of brokers connected. Needed by Raft.
+     *
+     * @return The id of the nodes connected.
+     */
+    public Set<String> getBrokersConnected()
+    {
+        // TODO: access to nodesConnected should be synchronized?
+        HashSet<String> retSet = new HashSet<>();
+
+        for(String nodeId : nodesConnected.keySet())
+        {
+            if(nodesConnected.get(nodeId).isBroker())
+            {
+                retSet.add(nodeId);
+            }
+        }
+
+        return retSet;
+    }
+
+    /**
+     * @return The number of brokers (the caller is included)
+     * connected at the moment.
+     */
+    public int getNumberOfBrokersConnected()
+    {
+        // TODO: access to nodesConnected should be synchronized?
+        int ret = 0;
+
+        for(String nodeId : nodesConnected.keySet())
+        {
+            if(nodesConnected.get(nodeId).isBroker())
+            {
+                ret++;
+            }
+        }
+
+        return ret;
     }
 
     /**

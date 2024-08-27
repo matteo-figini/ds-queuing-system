@@ -11,7 +11,7 @@ import java.util.List;
  * This class represents a log update message. The leader sends this message to the followers
  * whenever there are new entries to be added to the log.
  */
-public class LogRequest<T> extends Message implements Serializable {
+public class LogRequest extends Message implements Serializable {
 
     public final String leaderId;
     public final Integer term;

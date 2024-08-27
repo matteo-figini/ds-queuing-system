@@ -13,9 +13,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * This class defines the logic of a Raft node.
- * @param <T> The type of the LogItem that will be stored in the node's log.
  */
-public class RaftNode<T> {
+public class RaftNode {
 
     /** Number of nodes in the raft network */
     // TODO: set from BrokerMain
@@ -51,9 +50,6 @@ public class RaftNode<T> {
 
     /** Used to distinguish node*/
     private final String nodeId;
-
-    /** List of nodeId of the other nodes in the network*/
-    private final Set<String> nodesConnected;
 
     private NodeState currentRole;
 
@@ -101,12 +97,6 @@ public class RaftNode<T> {
      */
     private final BrokerController brokerController;
 
-    /**
-     * This is a counter used to give to the brokerController a unique value
-     * that can be used to distinguish operations.
-     */
-    private Integer operationIndex = 0;
-
     /* ---------- TIMEOUT CHECKERS ---------- */
 
     /**
@@ -141,12 +131,11 @@ public class RaftNode<T> {
      * Class constructor.
      *
      * @param nodeId The univoqe id of the node being created.
-     * @param nodesConnected Reference to the list of the active nodes.
      * @param eventsQueue The reference to the queue where raft events are published.
      * @param brokerController
      * @param netAlreadyStarted True if the network has already started and this node is joining back after a crash.
      */
-    public RaftNode(String nodeId, final Set<String> nodesConnected, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController, boolean netAlreadyStarted)
+    public RaftNode(String nodeId, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController, boolean netAlreadyStarted)
     {
         // TODO: are these assertions needed?
         if(NUM_NODES % 2 == 0 || NUM_NODES < 3)
@@ -155,7 +144,6 @@ public class RaftNode<T> {
         }
 
         this.nodeId = nodeId;
-        this.nodesConnected = nodesConnected;
         this.eventsQueue = eventsQueue;
         this.brokerController = brokerController;
 
@@ -247,7 +235,7 @@ public class RaftNode<T> {
                         break;
                     case LOG_REQUEST:
                         System.out.println("[INFO] Received log request");
-                        this.onLogRequest((LogRequest<T>) m);
+                        this.onLogRequest((LogRequest) m);
                         break;
                     case LOG_RESPONSE:
                         System.out.println("[INFO] Received log response");
@@ -524,7 +512,7 @@ public class RaftNode<T> {
                 timeoutHandlerElectionCandidate.disableAndRemove();
 
                 // Send first message to each follower
-                for(String followerId : nodesConnected)
+                for(String followerId : brokerController.getBrokersConnected())
                 {
                     if(!Objects.equals(followerId, nodeId))
                     {
@@ -579,7 +567,7 @@ public class RaftNode<T> {
         // Update ackedLength of the leader
         ackedLength.put(nodeId, log.size());
 
-        for(String followerId : nodesConnected)
+        for(String followerId : brokerController.getBrokersConnected())
         {
             if(!Objects.equals(followerId, nodeId)) // Avoid leader sending to himself
             {
@@ -617,7 +605,7 @@ public class RaftNode<T> {
 
         // send to followerId
         // TODO: `commitLength` is it right?
-        Message msg = new LogRequest<T>(currentLeader, currentTerm, prefixLen, prefixTerm, commitLength, suffix);
+        Message msg = new LogRequest(currentLeader, currentTerm, prefixLen, prefixTerm, commitLength, suffix);
         brokerController.sendMessage(followerId, msg);
     }
 
@@ -629,7 +617,7 @@ public class RaftNode<T> {
      *
      * @param logRequest The message received from the leader.
      */
-    private void onLogRequest(final LogRequest<T> logRequest)
+    private void onLogRequest(final LogRequest logRequest)
     {
         // Check if there were timeouts running, stop them if needed
         timeoutHandlerElectionFollower.disableAndRemove();
@@ -776,7 +764,7 @@ public class RaftNode<T> {
         while(commitLength < log.size() && keepGoing)
         {
             int acks = 0;
-            for(String node : nodesConnected)
+            for(String node : brokerController.getBrokersConnected())
             {
                 if(ackedLength.get(node) > commitLength)
                 {
@@ -784,7 +772,7 @@ public class RaftNode<T> {
                 }
             }
 
-            if(acks > (nodesConnected.size() + 1) / 2)
+            if(acks > (brokerController.getNumberOfBrokersConnected() + 1) / 2)
             {
                 // deliver log[commitLength].msg to the application
                 // TODO: is this enough? It should be for now, at least for testing.
@@ -811,7 +799,10 @@ public class RaftNode<T> {
             //  by the raft thread or by the brokerController thread?
             brokerController.printQueues();
 
-            for(String followerId : nodesConnected)
+            // New messages committed -> send notification to the followers
+            // Normally this wouldn't be necessary, because followers would
+            // get notified by the heartbeat, but we removed it
+            for(String followerId : brokerController.getBrokersConnected())
             {
                 if(!Objects.equals(followerId, nodeId))
                 {
