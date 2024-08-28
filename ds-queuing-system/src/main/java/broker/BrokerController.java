@@ -24,6 +24,7 @@ import raft.RaftNode;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -37,7 +38,7 @@ public class BrokerController {
 
     // This structure keeps a reference to every other node (broker or client) connected to the broker, identified
     // by their name.
-    private final HashMap<String, NodeReference> nodesConnected = new HashMap<>();
+    private final ConcurrentHashMap<String, NodeReference> nodesConnected = new ConcurrentHashMap<>();
     private String leaderBroker;
 
     // Raft stuff

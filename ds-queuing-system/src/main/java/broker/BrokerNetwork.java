@@ -100,7 +100,6 @@ public class BrokerNetwork {
             otherBrokersClientHandlers.put(message.getNodeName(), otherNodeClientHandler);
         } else {
             clientsClientHandlers.put(message.getNodeName(), otherNodeClientHandler);
-            System.out.println(clientsClientHandlers);
         }
         // Add the reference of the node to the list of connected nodes.
         NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(), message.getNodePublicPort(),
