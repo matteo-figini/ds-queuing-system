@@ -4,6 +4,7 @@ import application.exceptions.EndOfQueueException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * This class represents the queue of the application.
@@ -47,23 +48,24 @@ public class AppQueue {
      * @return The value from the queue.
      * @throws EndOfQueueException Thrown when the reader reaches the end of the queue.
      */
-    public Integer get(final String readerName) throws EndOfQueueException
+    public List<Integer> get(final String readerName) throws EndOfQueueException
     {
-        Integer retValue = 0;
+        ArrayList<Integer> retValue = new ArrayList<>();
 
         // Get last index if this is not the first read for the user
         Integer idx = mapIndexes.getOrDefault(readerName, 0);
 
-        // Read the value
-        if(idx < queue.size())
-        {
-            retValue = queue.get(idx);
-            idx++;
-        }
-        else
+        if (idx >= queue.size())
         {
             // This reader has already reached the end of the list
             throw new EndOfQueueException();
+        }
+
+        // Read the value
+        while(idx < queue.size())
+        {
+            retValue.add(queue.get(idx));
+            idx++;
         }
 
         // Update the iterators list

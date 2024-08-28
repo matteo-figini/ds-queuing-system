@@ -32,7 +32,7 @@ public class AppQueueManager {
      * @throws QueueNotFoundException Thrown if there is no queue with such name.
      * @throws EndOfQueueException Thrown if the user reached the end of the queue.
      */
-    public Integer commitRead(final String queueName, final String readerName) throws QueueNotFoundException, EndOfQueueException
+    public List<Integer> commitRead(final String queueName, final String readerName) throws QueueNotFoundException, EndOfQueueException
     {
         if(!mapQueues.containsKey(queueName))
         {

@@ -290,7 +290,7 @@ public class BrokerController {
             {
                 case CREATE_QUEUE_REQUEST -> response = new CreateQueueResponse(false, errorMessage);
                 case APPEND_QUEUE_REQUEST -> response = new AppendQueueResponse(false, errorMessage);
-                case READ_QUEUE_REQUEST -> response = new ReadQueueResponse(0,false, errorMessage);
+                case READ_QUEUE_REQUEST -> response = new ReadQueueResponse(new ArrayList<>(),false, errorMessage);
                 default -> throw new RuntimeException("Message type not supported by onClientRequest()");
             }
 
@@ -412,12 +412,12 @@ public class BrokerController {
             case READ_QUEUE -> {
                 ReadQueue op = (ReadQueue) operation;
 
-                Integer value = 0;
+                List<Integer> values = new ArrayList<>();
 
-                try { value = queueManager.commitRead(op.queueName, op.readerName); }
+                try { values = queueManager.commitRead(op.queueName, op.readerName); }
                 catch (Exception e) { e.printStackTrace(); } // Cannot fail, already tested before
 
-                response = new ReadQueueResponse(value, true);
+                response = new ReadQueueResponse(values, true);
             }
             default -> throw new RuntimeException("Operation type not supported"); // Used to suppress java warnings
         }

@@ -7,23 +7,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ReadQueueResponse extends Message {
-    private final Integer elementRead;
+    private final List<Integer> elementsRead;
     private final boolean status;
     private String infoMessage;
 
-    public ReadQueueResponse (Integer elementRead, boolean status) {
+    public ReadQueueResponse (List<Integer> elementsRead, boolean status) {
         super(MessageType.READ_QUEUE_RESPONSE);
-        this.elementRead = elementRead;
+        this.elementsRead = elementsRead;
         this.status = status;
     }
 
-    public ReadQueueResponse (Integer elementRead, boolean status, String infoMessage) {
-        this(elementRead, status);
+    public ReadQueueResponse (List<Integer> elementsRead, boolean status, String infoMessage) {
+        this(elementsRead, status);
         this.infoMessage = infoMessage;
     }
 
-    public Integer getElementsRead() {
-        return elementRead;
+    public List<Integer> getElementsRead() {
+        return elementsRead;
     }
 
     public boolean getStatus() {
@@ -37,7 +37,7 @@ public class ReadQueueResponse extends Message {
     @Override
     public String toString() {
         return "ReadQueueResponse{" +
-                "elementsRead=" + elementRead +
+                "elementsRead=" + elementsRead +
                 ", status=" + status +
                 ", infoMessage='" + infoMessage + '\'' +
                 '}';
