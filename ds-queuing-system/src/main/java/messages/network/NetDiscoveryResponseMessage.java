@@ -17,17 +17,22 @@ public class NetDiscoveryResponseMessage extends Message {
     /** List of brokers actually connected to the locator. */
     private final List<NodeReference> brokersConnected;
 
+    /** Current state of the network. */
     private final NetworkState netState;
+
+    /** Maximum number of brokers connected. */
+    private final int maximumBrokersNumber;
 
     /**
      * Create the {@code NetDiscoveryResponseMessage}.
      * @param brokersConnected List of brokers actually connected to the locator.
      * @param networkState The current state of the network.
      */
-    public NetDiscoveryResponseMessage(List<NodeReference> brokersConnected, NetworkState networkState) {
+    public NetDiscoveryResponseMessage(List<NodeReference> brokersConnected, NetworkState networkState, int maximumBrokersNumber) {
         super(MessageType.NET_DISCOVERY_RESPONSE);
         this.brokersConnected = new ArrayList<NodeReference>(brokersConnected);
         this.netState = networkState;
+        this.maximumBrokersNumber = maximumBrokersNumber;
     }
 
     /**
@@ -40,6 +45,13 @@ public class NetDiscoveryResponseMessage extends Message {
     public NetworkState getNetworkState()
     {
         return netState;
+    }
+
+    /**
+     * @return Maximum number of connected brokers.
+     */
+    public int getMaximumBrokersNumber() {
+        return maximumBrokersNumber;
     }
 
     @Override

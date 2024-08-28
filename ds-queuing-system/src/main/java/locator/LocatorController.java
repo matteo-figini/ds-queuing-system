@@ -19,7 +19,7 @@ public class LocatorController {
     private LocatorNetwork locatorNetworkRef;
     private final List<NodeReference> nodesConnected = new ArrayList<>();
     private int brokersConnected = 0;
-    private final int maximumBrokerNumber;
+    private final int maximumBrokersNumber;
     private NodeReference leader;   // Reference to the current leader of the network
 
     private NetworkState networkState;
@@ -29,7 +29,7 @@ public class LocatorController {
      * @param brokers The maximum number of brokers connected to the network.
      */
     public LocatorController (int brokers) {
-        this.maximumBrokerNumber = brokers;
+        this.maximumBrokersNumber = brokers;
         this.networkState = NetworkState.CONNECTING_BROKERS;
     }
 
@@ -69,7 +69,7 @@ public class LocatorController {
         ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
         senderReference.setNodeName(message.getNodeName());
         System.out.println("[INFO] Set node name: " + senderReference.getNodeName());
-        if (message.isBroker() && brokersConnected >= maximumBrokerNumber) {
+        if (message.isBroker() && brokersConnected >= maximumBrokersNumber) {
             System.out.println("[ERROR] Number of maximum brokers already reached: unable to connect " + message.getNodeName());
             senderReference.sendMessage(new HelloResponseMessage(false));
         } else {
@@ -99,10 +99,10 @@ public class LocatorController {
      */
     public void onNetDiscoveryRequest (NetDiscoveryRequestMessage message, NodeHandler senderReference) {
         List<NodeReference> brokersConnected = getConnectedBrokers();
-        senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected, networkState));
+        senderReference.sendMessage(new NetDiscoveryResponseMessage(brokersConnected, networkState, maximumBrokersNumber));
         // If all the required brokers are connected, send a message to all the brokers.
         // A small delay is set to allow all the residual messages to be properly exchanged.
-        if (networkState == NetworkState.CONNECTING_BROKERS && this.brokersConnected == maximumBrokerNumber) {
+        if (networkState == NetworkState.CONNECTING_BROKERS && this.brokersConnected == maximumBrokersNumber) {
             this.networkState = NetworkState.NETWORK_CONNECTED;
             ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
             startRunning.schedule(() -> {

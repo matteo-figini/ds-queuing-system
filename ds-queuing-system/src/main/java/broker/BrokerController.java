@@ -36,6 +36,8 @@ public class BrokerController {
     private final String localIPAddress;
     private BrokerNetwork brokerNetwork;
 
+    private int maximumBrokersNumber;
+
     // This structure keeps a reference to every other node (broker or client) connected to the broker, identified
     // by their name.
     private final ConcurrentHashMap<String, NodeReference> nodesConnected = new ConcurrentHashMap<>();
@@ -128,6 +130,10 @@ public class BrokerController {
      * @param message Message received.
      */
     private void onNetDiscoveryResponseMessage (NetDiscoveryResponseMessage message) {
+        // Update the number of brokers (needed for Raft)
+        this.maximumBrokersNumber = message.getMaximumBrokersNumber();
+
+        // Add the other connected brokers and try to instantiate a connection
         message.getBrokersConnected().stream().filter(nodeReference -> !nodeReference.nodeName().equals(brokerName))
                 .forEach(nodeReference -> nodesConnected.put(nodeReference.nodeName(), nodeReference));
         connectToOtherBrokers();
