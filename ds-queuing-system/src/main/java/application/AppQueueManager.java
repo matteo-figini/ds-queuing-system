@@ -45,17 +45,21 @@ public class AppQueueManager {
     /**
      * Insert a value at the end of the specified queue.
      * @param queueName The name of the queue.
-     * @param value The value to be inserted.
+     * @param listValues The list of values to be inserted.
      * @throws QueueNotFoundException Thrown if there is no queue with such name.
      */
-    public void commitAppend(final String queueName, final Integer value) throws QueueNotFoundException
+    public void commitAppend(final String queueName, final List<Integer> listValues) throws QueueNotFoundException
     {
         if(!mapQueues.containsKey(queueName))
         {
             throw new QueueNotFoundException();
         }
 
-        mapQueues.get(queueName).add(value);
+        AppQueue queue = mapQueues.get(queueName);
+        for(Integer value : listValues)
+        {
+            queue.add(value);
+        }
     }
 
     /**
@@ -111,7 +115,7 @@ public class AppQueueManager {
                 }
                 case APPEND_QUEUE -> {
                     final AppendQueue op = (AppendQueue) operation;
-                    commitAppend(op.queueName, op.value);
+                    commitAppend(op.queueName, op.listValues);
                 }
                 case CREATE_QUEUE -> {
                     final CreateQueue op = (CreateQueue) operation;

@@ -322,11 +322,7 @@ public class BrokerController {
             }
             case APPEND_QUEUE_REQUEST -> {
                 final AppendQueueRequest r = (AppendQueueRequest) request;
-                // TODO: raft currently supports only APPEND WITH 1 VALUE, while the
-                //  client commands interpreter and the AppendQueueRequest takes multiple
-                //  values. Decide which way to go, for now only the first value is taken,
-                //  following raft's convention.
-                appendMessage = new RaftAppendMessage(new AppendQueue(r.getQueueName(), r.getAppendElements().get(0), clientName));
+                appendMessage = new RaftAppendMessage(new AppendQueue(r.getQueueName(), r.getAppendElements(), clientName));
             }
             case READ_QUEUE_REQUEST -> {
                 final ReadQueueRequest r = (ReadQueueRequest) request;
@@ -364,7 +360,7 @@ public class BrokerController {
             }
             case APPEND_QUEUE -> {
                 final AppendQueue op = (AppendQueue) operation;
-                try { queueManager.commitAppend(op.queueName, op.value); }
+                try { queueManager.commitAppend(op.queueName, op.listValues); }
                 catch (Exception e) { e.printStackTrace(); } // It shouldn't fail, it should be tested before
             }
             case CREATE_QUEUE -> {
@@ -410,7 +406,7 @@ public class BrokerController {
                 AppendQueue op = (AppendQueue) operation;
                 response = new AppendQueueResponse(true);
 
-                try { queueManager.commitAppend(op.queueName, op.value); }
+                try { queueManager.commitAppend(op.queueName, op.listValues); }
                 catch (Exception e) { e.printStackTrace(); } // Cannot fail, already tested before
             }
             case READ_QUEUE -> {
