@@ -23,7 +23,6 @@ public class RaftNode {
     /**
      * Value of the election timeout for the candidate (how much time the election
      * phase has before aborting). Expressed in milliseconds.
-     * TODO: is 5s fine?
      */
     private static final Integer ELECTION_OUT_OF_TIME_TIMEOUT_CANDIDATE = 5000;
 
@@ -32,7 +31,6 @@ public class RaftNode {
      * before the followers start suspecting a candidate's failure. Expressed in milliseconds.
      * Gives an extra second with respect to the candidate value to take into account
      * connection slowness.
-     * TODO: is it fine?
      */
     private final Integer ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER;
 
@@ -314,7 +312,6 @@ public class RaftNode {
         }
         catch (IOException e)
         {
-            // TODO: improve?
             System.out.println(e.getMessage());
             e.printStackTrace();
         }
@@ -333,6 +330,14 @@ public class RaftNode {
         final AskLeaderResponse response = new AskLeaderResponse(currentLeader);
 
         brokerController.sendMessage(msg.sender, response);
+
+        if(currentRole == NodeState.LEADER)
+        {
+            // A node has re-joined the network -> as leader
+            // I send a logRequest in order to update him and
+            // receive approval for uncommitted messages
+            replicateLog(msg.sender);
+        }
     }
 
     private void onAskLeaderResponse(final AskLeaderResponse msg)
@@ -355,7 +360,6 @@ public class RaftNode {
         {
             // There is no actual leader
             onLeaderDisconnection();
-            // TODO: se ricevo questo messaggio dopo che un elezione è in corso / è già avvenuta???
         }
     }
 
@@ -401,7 +405,7 @@ public class RaftNode {
         if(!log.isEmpty())
             voteMsg = new VoteRequest(nodeId, currentTerm, log.size(), log.get(log.size() - 1).term);
         else
-            voteMsg = new VoteRequest(nodeId, currentTerm, 0, 0); // TODO: lastTerm = 0 ?
+            voteMsg = new VoteRequest(nodeId, currentTerm, 0, 0);
         brokerController.sendMessage(BrokerNetwork.ALL_BROKERS_CMD, voteMsg);
 
         // Start election timer
@@ -481,6 +485,15 @@ public class RaftNode {
 
         final Message msg = new VoteResponse(nodeId, currentTerm, vote);
         brokerController.sendMessage(voteReq.cId, msg);
+
+        if(!vote && currentRole != NodeState.LEADER)
+        {
+            // The vote is negative, for some reason the
+            // candidate is not suitable -> I try myself
+            // TODO: should I check if this node wasn't already
+            //  running an election?
+            onLeaderDisconnection();
+        }
     }
 
     /**
@@ -501,7 +514,6 @@ public class RaftNode {
             if(votesReceived.size() >= (NUM_NODES + 1) / 2)
             {
                 // Election won
-                // TODO: remove print
                 System.out.println("[INFO] ELECTION WON");
 
                 currentRole = NodeState.LEADER;
@@ -593,7 +605,7 @@ public class RaftNode {
             throw new RuntimeException("Error, this function should be called only on the leader node");
         }
 
-        int prefixLen = sentLength.get(followerId);
+        int prefixLen = sentLength.getOrDefault(followerId, 0);
 
         List<LogItem> suffix = new ArrayList<>(log.subList(prefixLen, log.size()));
 
@@ -604,7 +616,6 @@ public class RaftNode {
         }
 
         // send to followerId
-        // TODO: `commitLength` is it right?
         Message msg = new LogRequest(currentLeader, currentTerm, prefixLen, prefixTerm, commitLength, suffix);
         brokerController.sendMessage(followerId, msg);
     }
@@ -693,14 +704,9 @@ public class RaftNode {
 
         if(leaderCommit > commitLength)
         {
-            // TODO: is this part (the whole commit part) needed? Or we can assume that
-            //  messages are delivered instantaneously to the application?
-
             for(int i = commitLength; i < leaderCommit; i++)
             {
                 // deliver log[i].msg to the application
-                // TODO: is this enough? It should be for now, at least for testing
-                //  Also check if this is equivalent with what is done inside commitLogEntries()
                 System.out.println("[INFO] New log entry committed from appendEntries(): " + log.get(i).operation);
 
                 // TODO: this operation is heavy, should it be performed
@@ -724,12 +730,12 @@ public class RaftNode {
     {
         if(Objects.equals(logResponse.term, currentTerm) && currentRole == NodeState.LEADER)
         {
-            if(logResponse.outcome && logResponse.ack >= ackedLength.get(logResponse.nodeId))
+            if(logResponse.outcome && logResponse.ack >= ackedLength.getOrDefault(logResponse.nodeId, 0))
             {
                 sentLength.put(logResponse.nodeId, logResponse.ack);
                 ackedLength.put(logResponse.nodeId, logResponse.ack);
 
-                commitLogEntries(); // TODO: is this part (the whole commit part) needed?
+                commitLogEntries();
             }
             else if(sentLength.get(logResponse.nodeId) > 0)
             {
@@ -741,7 +747,7 @@ public class RaftNode {
         {
             currentTerm = logResponse.term;
             currentRole = NodeState.FOLLOWER;
-            votedFor = null; // TODO: is it consistent?
+            votedFor = null;
 
             // Cancel election timer
             // TODO: check, why should i stop election timer in the leader?
@@ -749,6 +755,17 @@ public class RaftNode {
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+
+        if(currentRole == NodeState.FOLLOWER)
+        {
+            // We received the response from a follower
+            // that has better rights to be the leader, so
+            // we switched to follower...
+            // Start a new election to trigger the election
+            // mechanism, then the network will sort out
+            // who's the best choice for a leader
+            onLeaderTimeout();
+        }
     }
 
     /**
