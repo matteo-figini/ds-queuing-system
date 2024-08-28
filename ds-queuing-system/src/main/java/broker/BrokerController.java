@@ -452,7 +452,7 @@ public class BrokerController {
     }
 
     /**
-     * @return The number of brokers (the caller is included)
+     * @return The number of brokers (the caller IS NOT INCLUDED)
      * connected at the moment.
      */
     public int getNumberOfBrokersConnected()

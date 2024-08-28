@@ -772,6 +772,8 @@ public class RaftNode {
      * Utility function that checks if any of the new log entries have been acknowledged
      * by a quorum of nodes. When the log entry is committed its message is delivered to
      * the application.
+     *
+     * This function is called by the leader only.
      */
     private void commitLogEntries()
     {
@@ -780,7 +782,7 @@ public class RaftNode {
 
         while(commitLength < log.size() && keepGoing)
         {
-            int acks = 0;
+            int acks = 1; // 1 because we already count the leader ack
             for(String node : brokerController.getBrokersConnected())
             {
                 if(ackedLength.get(node) > commitLength)
@@ -789,11 +791,9 @@ public class RaftNode {
                 }
             }
 
-            if(acks > (brokerController.getNumberOfBrokersConnected() + 1) / 2)
+            if(acks >= (NUM_NODES + 1) / 2)
             {
                 // deliver log[commitLength].msg to the application
-                // TODO: is this enough? It should be for now, at least for testing.
-                //  Also check if this is equivalent with what is done inside appendEntries()
                 System.out.println("[INFO] New log entry committed from commitLogEntries(): " + log.get(commitLength).operation);
 
                 // TODO: this operation is heavy, should it be performed
