@@ -17,8 +17,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class RaftNode {
 
     /** Number of nodes in the raft network */
-    // TODO: set from BrokerMain
-    private static final Integer NUM_NODES = 3;
+    private final Integer NUM_NODES;
 
     /**
      * Value of the election timeout for the candidate (how much time the election
@@ -130,20 +129,17 @@ public class RaftNode {
      *
      * @param nodeId The univoqe id of the node being created.
      * @param eventsQueue The reference to the queue where raft events are published.
-     * @param brokerController
+     * @param brokerController The reference to the BrokerController.
      * @param netAlreadyStarted True if the network has already started and this node is joining back after a crash.
+     * @param numNodes Number of nodes in the raft network to be created.
      */
-    public RaftNode(String nodeId, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController, boolean netAlreadyStarted)
+    public RaftNode(String nodeId, LinkedBlockingQueue<Message> eventsQueue, BrokerController brokerController,
+                    boolean netAlreadyStarted, final int numNodes)
     {
-        // TODO: are these assertions needed?
-        if(NUM_NODES % 2 == 0 || NUM_NODES < 3)
-        {
-            throw new RuntimeException("NUM_NODES should be and odd number >1");
-        }
-
         this.nodeId = nodeId;
         this.eventsQueue = eventsQueue;
         this.brokerController = brokerController;
+        this.NUM_NODES = numNodes;
 
         Random rand = new Random();
         // Obtain a number between [0 - 49].

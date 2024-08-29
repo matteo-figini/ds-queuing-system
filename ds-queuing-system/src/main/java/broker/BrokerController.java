@@ -36,6 +36,9 @@ public class BrokerController {
     private final String localIPAddress;
     private BrokerNetwork brokerNetwork;
 
+    /**
+     * Number of nodes in the raft network to be created.
+     */
     private int maximumBrokersNumber;
 
     // This structure keeps a reference to every other node (broker or client) connected to the broker, identified
@@ -167,7 +170,7 @@ public class BrokerController {
         System.out.println("Raft ready to start");
 
         // Start raft node
-        raftNode = new RaftNode(brokerName, eventsQueue, this, networkAlreadyStarted);
+        raftNode = new RaftNode(brokerName, eventsQueue, this, networkAlreadyStarted, maximumBrokersNumber);
         raftThread = new Thread() {
             public void run() {
                 raftNode.waitForEvents();
