@@ -47,7 +47,7 @@ public class LocatorSocket {
     public void sendMessage (Message message) {
         try {
             socketOutputStream.writeObject(message);
-            socketOutputStream.reset();
+            socketOutputStream.flush();
         } catch (IOException e) {
             disconnect();
             System.out.println("[EXCEPTION] Cannot send the message to the locator. Disconnected.");

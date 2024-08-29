@@ -47,7 +47,7 @@ public class LeaderSocket {
     public void sendMessage(Message message) {
         try {
             this.objectOutputStream.writeObject(message);
-            this.objectOutputStream.reset();
+            this.objectOutputStream.flush();
         } catch (IOException e) {
             System.out.println("[EXCEPTION] " + e.getMessage());
             disconnect();

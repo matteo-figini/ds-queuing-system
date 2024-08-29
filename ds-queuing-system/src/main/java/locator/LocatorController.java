@@ -167,14 +167,12 @@ public class LocatorController {
         System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\" from the locator.");
         System.out.println("[INFO] Brokers connected: " + brokersConnected);
 
-        // It might happen that there are not enough nodes in the
-        // network to have a successful election, in that case
-        // there is no leader in the network
-        if(leader != null)
-        {
+        // It might happen that there are not enough nodes in the network to have a successful election, in that case
+        // there is no leader in the network.
+        if (leader != null) {
             // If the node disconnected is the leader, remove the leader's reference
             if (leader.nodeName().equals(nodeHandler.getNodeName())) {
-                System.out.println("[INFO] The disconnected node was the leader " + leader.nodeName());
+                System.out.println("[INFO] The disconnected node was the leader: " + leader.nodeName());
                 leader = null;
             }
         }

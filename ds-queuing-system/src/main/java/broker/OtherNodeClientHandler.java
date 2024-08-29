@@ -83,7 +83,7 @@ public class OtherNodeClientHandler implements Runnable {
         try {
             synchronized (outputLockObject) {
                 brokerSocketOS.writeObject(message);
-                brokerSocketOS.reset();
+                brokerSocketOS.flush();
                 System.out.println("Message sent: " + message.toString());
             }
         } catch (IOException e) {

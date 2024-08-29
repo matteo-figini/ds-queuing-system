@@ -66,6 +66,9 @@ public class NodeHandler implements Runnable {
                         System.out.println("[EXCEPTION] Unable to close the socket: " + ex.getMessage());
                     }
                     Thread.currentThread().interrupt();
+                } catch (ClassCastException cce) {
+                    cce.printStackTrace();
+                    System.out.println("[EXCEPTION] Message was: " + message);
                 }
                 // If the message is valid, handle it.
                 if (message != null) {
@@ -85,7 +88,7 @@ public class NodeHandler implements Runnable {
             synchronized (outputLockObject) {
                 System.out.println("[INFO] Sending message: " + message.toString() + ", to node: " + clientSocket.getInetAddress());
                 outputStream.writeObject(message);
-                outputStream.reset();
+                outputStream.flush();
                 System.out.println("[INFO] Message sent.");
             }
         } catch (IOException e) {

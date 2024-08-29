@@ -13,6 +13,8 @@ public class LeaderDiscoveryRequest extends Message {
 
     @Override
     public String toString() {
-        return "LeaderDiscoveryRequest{}";
+        return "LeaderDiscoveryRequest{" +
+                "type=" + type +
+                '}';
     }
 }

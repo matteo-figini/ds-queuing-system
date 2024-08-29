@@ -58,9 +58,9 @@ public class ClientNetwork {
      * @param message Message to be sent to the receiver.
      */
     public void sendMessage(String receiver, Message message) {
-        if (receiver.equalsIgnoreCase("locator")) {
+        if (receiver.equalsIgnoreCase("locator") && socketToLocator != null) {
             socketToLocator.sendMessage(message);
-        } else if (receiver.equalsIgnoreCase("leader")) {
+        } else if (receiver.equalsIgnoreCase("leader") && leaderSocket != null) {
             leaderSocket.sendMessage(message);
         }
     }

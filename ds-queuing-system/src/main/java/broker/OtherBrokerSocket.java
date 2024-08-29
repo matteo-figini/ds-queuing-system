@@ -47,7 +47,7 @@ public class OtherBrokerSocket {
     public void sendMessage(Message message) {
         try {
             this.otherBrokerOS.writeObject(message);
-            this.otherBrokerOS.reset();
+            this.otherBrokerOS.flush();
         } catch (IOException e) {
             System.out.println("[EXCEPTION] " + e.getMessage());
             disconnect();
