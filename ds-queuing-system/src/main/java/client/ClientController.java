@@ -1,6 +1,7 @@
 package client;
 
 import messages.Message;
+import messages.MessageType;
 import messages.application.AppendQueueResponse;
 import messages.application.CreateQueueResponse;
 import messages.application.ReadQueueResponse;
@@ -8,6 +9,7 @@ import messages.network.*;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,6 +26,25 @@ public class ClientController {
     private CommandInterpreter commandInterpreter;
 
     private String localIPAddress;
+
+    /**
+     * True if at the moment there is a connection with the leader.
+     *
+     * In case the network's leader is missing it is not possible to send
+     * a new request.
+     */
+    private boolean connectedToLeader = false;
+    private final Object mutexConnectedToLeader = new Object();
+
+    /**
+     * True if I've already sent an operation request, and I'm
+     * waiting for a response.
+     *
+     * In that case it's not possible to send a new command
+     * until we've received a response for the current one.
+     */
+    private boolean waitingForOperationResponse = false;
+    private final Object mutexWaitingForOperationResponse = new Object();
 
     /**
      * Create the instance of {@code ClientController}.
@@ -56,16 +77,41 @@ public class ClientController {
             System.out.println("[EXCEPTION] Adding the default address: " + localIPAddress);
         }
         // Start the thread that continuously waits for new inputs and process them as commands.
-        keyboardInputRoutine.execute(() -> {
-            Scanner scanner = new Scanner(System.in);
-            while (!keyboardInputRoutine.isShutdown()) {
-                String readString = scanner.nextLine();
-                commandInterpreter.interpretAndSendCommand(readString);
-            }
-        });
+        keyboardInputRoutine.execute(this::inputRoutine);
         // Field "nodePublicPort" is not relevant
         HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, 0, clientName, false);
         clientNetwork.sendMessage("locator", helloMessage);
+    }
+
+    /**
+     * Code of the thread that continuously waits for new inputs
+     * and process them as commands.
+     */
+    private void inputRoutine()
+    {
+        Scanner scanner = new Scanner(System.in);
+        while (!keyboardInputRoutine.isShutdown()) {
+            String readString = scanner.nextLine();
+
+            synchronized (mutexConnectedToLeader)
+            {
+                synchronized (mutexWaitingForOperationResponse)
+                {
+                    if(connectedToLeader && !waitingForOperationResponse)
+                    {
+                        commandInterpreter.interpretAndSendCommand(readString);
+                    }
+                    else if(!connectedToLeader)
+                    {
+                        System.out.println("[ERROR] Cannot make requests while not connected to the leader.");
+                    }
+                    else if(waitingForOperationResponse)
+                    {
+                        System.out.println("[ERROR] Cannot make new requests while waiting for an operation to complete.");
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -74,6 +120,16 @@ public class ClientController {
      * @param message {@code Message} to be sent.
      */
     public void sendMessage (String receiver, Message message) {
+
+        if(message.type == MessageType.APPEND_QUEUE_REQUEST || message.type == MessageType.CREATE_QUEUE_REQUEST ||
+           message.type == MessageType.READ_QUEUE_REQUEST)
+        {
+            synchronized (mutexWaitingForOperationResponse)
+            {
+                waitingForOperationResponse = true;
+            }
+        }
+
         clientNetwork.sendMessage(receiver, message);
     }
 
@@ -84,6 +140,16 @@ public class ClientController {
      */
     public void update (Message message, String sender) {
         if (message != null) {
+
+            if(message.type == MessageType.APPEND_QUEUE_RESPONSE || message.type == MessageType.CREATE_QUEUE_RESPONSE ||
+                    message.type == MessageType.READ_QUEUE_RESPONSE)
+            {
+                synchronized (mutexWaitingForOperationResponse)
+                {
+                    waitingForOperationResponse = false;
+                }
+            }
+
             switch (message.type) {
                 case HELLO_RESPONSE -> onHelloResponseMessage((HelloResponseMessage) message, sender);
                 case LEADER_DISCOVERY_RESPONSE -> onLeaderDiscoveryResponse((LeaderDiscoveryResponse) message, sender);
@@ -117,6 +183,12 @@ public class ClientController {
      */
     private void onLeaderDiscoveryResponse (LeaderDiscoveryResponse message, String sender) {
         if (message.absenceOfLeader()) {
+
+            synchronized (mutexConnectedToLeader)
+            {
+                connectedToLeader = false;
+            }
+
             final int waitingSeconds = 5;
             System.out.println("[INFO] No available leader now: retrying in " + waitingSeconds + " seconds...");
             ScheduledExecutorService retrySendingMessage = Executors.newSingleThreadScheduledExecutor();
@@ -125,6 +197,11 @@ public class ClientController {
             System.out.println("[INFO] Setting available leader: " + message.getLeaderReference().nodeName());
             HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, 0, clientName, false);
             clientNetwork.connectToBrokerLeader(message.getLeaderReference(), helloMessage);
+
+            synchronized (mutexConnectedToLeader)
+            {
+                connectedToLeader = true;
+            }
         }
     }
 
@@ -133,6 +210,12 @@ public class ClientController {
      * The request is postponed with a negligible delay to allow the locator to update and send stable information.
      */
     public void onLeaderDisconnection() {
+
+        synchronized (mutexConnectedToLeader)
+        {
+            connectedToLeader = false;
+        }
+
         ScheduledExecutorService newLeaderRequest = Executors.newSingleThreadScheduledExecutor();
         newLeaderRequest.schedule(() -> clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest()),
                 1, TimeUnit.SECONDS);
