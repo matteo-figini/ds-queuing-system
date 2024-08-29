@@ -27,16 +27,12 @@ public class LocatorSocket {
      * @param locatorIP IP address of the locator.
      * @param locatorPort Port, on which the locator keeps listening for new connections.
      */
-    public LocatorSocket(ClientNetwork clientNetwork, String locatorIP, int locatorPort) {
+    public LocatorSocket(ClientNetwork clientNetwork, String locatorIP, int locatorPort) throws IOException {
         this.clientNetwork = clientNetwork;
         socketToLocator = new Socket();
-        try {
-            socketToLocator.connect(new InetSocketAddress(locatorIP, locatorPort));
-            socketInputStream = new ObjectInputStream(socketToLocator.getInputStream());
-            socketOutputStream = new ObjectOutputStream(socketToLocator.getOutputStream());
-        } catch (IOException e) {
-            System.out.println("[EXCEPTION] " + e);
-        }
+        socketToLocator.connect(new InetSocketAddress(locatorIP, locatorPort));
+        socketInputStream = new ObjectInputStream(socketToLocator.getInputStream());
+        socketOutputStream = new ObjectOutputStream(socketToLocator.getOutputStream());
     }
 
     /**

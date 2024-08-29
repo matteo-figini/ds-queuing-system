@@ -13,6 +13,9 @@ public class ClientNetwork {
     private LocatorSocket socketToLocator;
     private LeaderSocket leaderSocket;
 
+    private final String locatorIPAddress;
+    private final int locatorPort;
+
     /**
      * Create the instance of {@code ClientNetwork} and tries to connect to the locator.
      * @param clientController Reference to the specific {@code ClientController}.
@@ -21,7 +24,14 @@ public class ClientNetwork {
      */
     public ClientNetwork (ClientController clientController, String locatorIPAddress, int locatorPort) {
         this.clientController = clientController;
-        socketToLocator = new LocatorSocket(this, locatorIPAddress, locatorPort);
+        this.locatorIPAddress = locatorIPAddress;
+        this.locatorPort = locatorPort;
+        try {
+            socketToLocator = new LocatorSocket(this, locatorIPAddress, locatorPort);
+        } catch (IOException e) {
+            System.out.println("[EXCEPTION] Cannot connect to the locator: " + e.getMessage());
+            System.exit(1);
+        }
     }
 
     /**
@@ -101,5 +111,13 @@ public class ClientNetwork {
      */
     public void onLocatorDisconnection(String ipAddress, int port) {
         System.out.println("[DISCONNECT] Locator on " + ipAddress + ":" + port +  " disconnected.");
+
+        // Try to instantly reconnect to the locator
+        try {
+            socketToLocator = new LocatorSocket(this, locatorIPAddress, locatorPort);
+        } catch (IOException e) {
+            System.out.println("[EXCEPTION] Cannot connect to the locator: " + e.getMessage());
+            System.exit(1);
+        }
     }
 }
