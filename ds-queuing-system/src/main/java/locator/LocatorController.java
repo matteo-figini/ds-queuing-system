@@ -136,10 +136,6 @@ public class LocatorController {
     private void onNewElectedLeader (NewElectedLeaderMessage message, NodeHandler senderReference) {
         setLeaderBroker(message.getLeaderReference().nodeName());
         System.out.println("[INFO] Set new elected leader: " + this.leader.nodeName());
-        // If the node is a client, send the message to them.
-        LeaderDiscoveryResponse leaderDiscoveryResponse = new LeaderDiscoveryResponse(false, this.leader);
-        nodesConnected.stream().filter(nodeReference -> !nodeReference.isBroker())
-                .forEach(nodeReference -> locatorNetworkRef.sendMessage(leaderDiscoveryResponse, nodeReference.nodeName()));
     }
 
     /* ---------- UTILITY METHODS ---------- */
