@@ -23,6 +23,8 @@ public class OtherBrokerSocket {
     private final ObjectOutputStream otherBrokerOS;
     private final BrokerNetwork brokerNetworkRef;
 
+    private final Object outputLockObject = new Object();
+
     /**
      * Create the {@code OtherBrokerSocket} as a connection from the broker to another broker.
      * @param name Name of the other broker.
@@ -46,8 +48,10 @@ public class OtherBrokerSocket {
      */
     public void sendMessage(Message message) {
         try {
-            this.otherBrokerOS.writeObject(message);
-            this.otherBrokerOS.flush();
+            synchronized (outputLockObject) {
+                this.otherBrokerOS.writeObject(message);
+                this.otherBrokerOS.flush();
+            }
         } catch (IOException e) {
             System.out.println("[EXCEPTION] " + e.getMessage());
             disconnect();

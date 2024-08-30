@@ -23,6 +23,8 @@ public class LeaderSocket {
     private final ObjectOutputStream objectOutputStream;
     private final ClientNetwork clientNetwork;
 
+    private final Object outputLockObject = new Object();
+
     /**
      * Instantiate the Socket connection to the broker's leader.
      * @param leaderName Name of the broker's leader.
@@ -46,8 +48,10 @@ public class LeaderSocket {
      */
     public void sendMessage(Message message) {
         try {
-            this.objectOutputStream.writeObject(message);
-            this.objectOutputStream.flush();
+            synchronized (outputLockObject) {
+                this.objectOutputStream.writeObject(message);
+                this.objectOutputStream.flush();
+            }
         } catch (IOException e) {
             System.out.println("[EXCEPTION] " + e.getMessage());
             disconnect();

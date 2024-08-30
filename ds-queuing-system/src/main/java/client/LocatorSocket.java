@@ -21,6 +21,8 @@ public class LocatorSocket {
 
     private final ClientNetwork clientNetwork;
 
+    private final Object outputLockObject = new Object();
+
     /**
      * Create the {@code LocatorSocket} object for the connection from the client to the locator.
      * @param clientNetwork Reference to the {@code ClientNetwork}.
@@ -42,8 +44,10 @@ public class LocatorSocket {
      */
     public void sendMessage (Message message) {
         try {
-            socketOutputStream.writeObject(message);
-            socketOutputStream.flush();
+            synchronized (outputLockObject) {
+                socketOutputStream.writeObject(message);
+                socketOutputStream.flush();
+            }
         } catch (IOException e) {
             disconnect();
             System.out.println("[EXCEPTION] Cannot send the message to the locator. Disconnected.");

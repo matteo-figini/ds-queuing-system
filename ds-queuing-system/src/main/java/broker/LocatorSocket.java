@@ -23,6 +23,8 @@ public class LocatorSocket {
     // Reference to the Broker Network
     private final BrokerNetwork brokerNetwork;
 
+    private final Object outputLockObject = new Object();
+
     /**
      * Create the {@code LocatorSocket} in order to connect to the locator.
      * @param brokerNetwork Reference to the current {@code BrokerNetwork}.
@@ -48,8 +50,10 @@ public class LocatorSocket {
      */
     public void sendMessage (Message message) {
         try {
-            locatorSocketOS.writeObject(message);
-            locatorSocketOS.flush();
+            synchronized (outputLockObject) {
+                locatorSocketOS.writeObject(message);
+                locatorSocketOS.flush();
+            }
         } catch (IOException e) {
             disconnect();
             System.out.println("[EXCEPTION] Cannot send the message to the locator. Disconnected.");
