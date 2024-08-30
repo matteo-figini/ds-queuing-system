@@ -23,6 +23,9 @@ import raft.RaftNode;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -109,6 +112,8 @@ public class BrokerController {
                     eventsQueue.add(message);
                 }
                 case CREATE_QUEUE_REQUEST, APPEND_QUEUE_REQUEST, READ_QUEUE_REQUEST -> onClientRequest(message);
+
+                case OPERATION_STATUS_REQUEST -> onOperationStatusRequest((OperationStatusRequest) message);
 
                 default -> System.out.println("[ERROR] Unknown message type " + message.type);
             }
@@ -310,37 +315,89 @@ public class BrokerController {
         }
 
         // The request is valid, send it to raft to be processed
-        eventsQueue.add(createRaftAppendMessage(request, clientName));
+        eventsQueue.add(createRaftAppendMessage(request));
     }
 
     /**
      * Utility used to create a RaftAppendMessage from a VALID client request.
      *
      * @param request The request from the client. Must be a valid one, not checked here.
-     * @param clientName The name of the client requesting the operation.
      * @return The RaftAppendMessage to be sent to raft.
      */
-    private RaftAppendMessage createRaftAppendMessage(final Message request, final String clientName)
+    private RaftAppendMessage createRaftAppendMessage(final Message request)
     {
         final RaftAppendMessage appendMessage;
         switch (request.type)
         {
             case CREATE_QUEUE_REQUEST -> {
                 final CreateQueueRequest r = (CreateQueueRequest) request;
-                appendMessage = new RaftAppendMessage(new CreateQueue(r.getQueueName(), clientName));
+                appendMessage = new RaftAppendMessage(new CreateQueue(r.getQueueName(), r.getClientName(), r.getTimestamp()));
             }
             case APPEND_QUEUE_REQUEST -> {
                 final AppendQueueRequest r = (AppendQueueRequest) request;
-                appendMessage = new RaftAppendMessage(new AppendQueue(r.getQueueName(), r.getAppendElements(), clientName));
+                appendMessage = new RaftAppendMessage(new AppendQueue(r.getQueueName(), r.getAppendElements(), r.getClientName(), r.getTimestamp()));
             }
             case READ_QUEUE_REQUEST -> {
                 final ReadQueueRequest r = (ReadQueueRequest) request;
-                appendMessage = new RaftAppendMessage(new ReadQueue(r.getClientName(), r.getQueueName(), clientName));
+                appendMessage = new RaftAppendMessage(new ReadQueue(r.getQueueName(), r.getClientName(), r.getTimestamp()));
             }
             default -> throw new RuntimeException("Message type not supported by createRaftAppendMessage()");
         }
 
         return appendMessage;
+    }
+
+    private void onOperationStatusRequest(final OperationStatusRequest request)
+    {
+        // Extract the operation and check if it is in the raft's log
+        final OperationRequest operationRequest = request.getRequest();
+        final String clientName;
+        final Operation requestedOperation;
+
+        switch (operationRequest.type)
+        {
+            case READ_QUEUE_REQUEST -> {
+                ReadQueueRequest r = (ReadQueueRequest) operationRequest;
+                clientName = r.getClientName();
+                requestedOperation = new ReadQueue(r.getQueueName(), r.getClientName(), r.getTimestamp());
+            }
+            case APPEND_QUEUE_REQUEST -> {
+                AppendQueueRequest r = (AppendQueueRequest) operationRequest;
+                clientName = r.getClientName();
+                requestedOperation = new AppendQueue(r.getQueueName(), r.getAppendElements(), r.getClientName(), r.getTimestamp());
+            }
+            case CREATE_QUEUE_REQUEST -> {
+                CreateQueueRequest r = (CreateQueueRequest) operationRequest;
+                clientName = r.getClientName();
+                requestedOperation = new CreateQueue(r.getQueueName(), r.getClientName(), r.getTimestamp());
+            }
+            default -> throw new RuntimeException("Operation type not supported");
+        }
+
+        final RaftNode.OperationStatus status = raftNode.checkOperationStatus(requestedOperation);
+
+        final OperationStatusResponse response;
+        if(status == RaftNode.OperationStatus.COMMITTED)
+        {
+            // The operation was already committed
+            response = OperationStatusResponse.newOperationCommittedResponse();
+        }
+        else if (status == RaftNode.OperationStatus.PENDING)
+        {
+            // The operation is pending, the
+            // client simply has to wait
+            response = OperationStatusResponse.newOperationPendingResponse();
+        }
+        else
+        {
+            // The operation is missing!
+            // Add it to raft
+            onClientRequest(operationRequest);
+
+            response = OperationStatusResponse.newOperationAddedResponse();
+        }
+
+        sendMessage(clientName, response);
     }
 
     /**

@@ -3,6 +3,8 @@ package messages.application;
 import messages.Message;
 import messages.MessageType;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,10 +13,9 @@ import java.util.List;
  * It contains the name of the selected queue and the list of elements (integers) to be appended
  * to that queue.
  */
-public class AppendQueueRequest extends Message {
+public class AppendQueueRequest extends OperationRequest {
     private final String queueName;
     private final List<Integer> appendElements;
-    private final String clientName;
 
     /**
      * Create a new message of type {@code AppendQueueRequest}.
@@ -23,10 +24,9 @@ public class AppendQueueRequest extends Message {
      * @param newElements List of the elements that will be appended to the queue.
      */
     public AppendQueueRequest(String clientName, String queueName, List<Integer> newElements) {
-        super(MessageType.APPEND_QUEUE_REQUEST);
+        super(MessageType.APPEND_QUEUE_REQUEST, clientName);
         this.queueName = queueName;
         this.appendElements = new ArrayList<>(newElements);
-        this.clientName = clientName;
     }
 
     /**
@@ -43,16 +43,12 @@ public class AppendQueueRequest extends Message {
         return appendElements;
     }
 
-    /**
-     * @return The name of the client requesting the operation.
-     */
-    public String getClientName() { return clientName; }
-
     @Override
     public String toString() {
         return "AppendQueueRequest{" +
                 "queueName='" + queueName + '\'' +
                 ", appendElements=" + appendElements +
+                ", ts=" + ts +
                 '}';
     }
 }

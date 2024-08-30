@@ -2,9 +2,7 @@ package client;
 
 import messages.Message;
 import messages.MessageType;
-import messages.application.AppendQueueResponse;
-import messages.application.CreateQueueResponse;
-import messages.application.ReadQueueResponse;
+import messages.application.*;
 import messages.network.*;
 
 import java.net.Inet4Address;
@@ -45,6 +43,12 @@ public class ClientController {
      */
     private boolean waitingForOperationResponse = false;
     private final Object mutexWaitingForOperationResponse = new Object();
+
+    /**
+     * Copy of the last request sent to the leader of the network.
+     * Saved in case a OperationStatusRequest has to be sent.
+     */
+    private OperationRequest lastRequest;
 
     /**
      * Create the instance of {@code ClientController}.
@@ -128,6 +132,9 @@ public class ClientController {
             {
                 waitingForOperationResponse = true;
             }
+
+            // Save the last request
+            lastRequest = (OperationRequest) message;
         }
 
         clientNetwork.sendMessage(receiver, message);
@@ -156,6 +163,7 @@ public class ClientController {
                 case CREATE_QUEUE_RESPONSE -> onCreateQueueResponse((CreateQueueResponse) message);
                 case READ_QUEUE_RESPONSE -> onReadQueueResponse((ReadQueueResponse) message);
                 case APPEND_QUEUE_RESPONSE -> onAppendQueueResponse((AppendQueueResponse) message);
+                case OPERATION_STATUS_RESPONSE -> onOperationStatusResponse((OperationStatusResponse) message);
                 default -> System.out.println("[EXCEPTION] Unhandled message type: " + message.type);
             }
         }
@@ -201,6 +209,56 @@ public class ClientController {
             synchronized (mutexConnectedToLeader)
             {
                 connectedToLeader = true;
+            }
+
+            if(shouldAskOperationStatus())
+            {
+                askOperationStatus();
+            }
+        }
+    }
+
+    /**
+     * @return True if there is an operation pending and the
+     * client should ask the leader (of the raft network) info
+     * about its operation.
+     */
+    private boolean shouldAskOperationStatus()
+    {
+        boolean shouldAsk = false;
+        synchronized (mutexWaitingForOperationResponse)
+        {
+            if(waitingForOperationResponse)
+            {
+                shouldAsk = waitingForOperationResponse;
+            }
+        }
+
+        return shouldAsk;
+    }
+
+    /**
+     * Called in case we are waiting for an operation response,
+     * the leader has crashed (disconnected) and a new leader has
+     * spawn. Send an OperationStatusRequest.
+     */
+    private void askOperationStatus()
+    {
+        final OperationStatusRequest request = new OperationStatusRequest(lastRequest);
+        sendMessage("leader", request);
+    }
+
+    private void onOperationStatusResponse(final OperationStatusResponse response)
+    {
+        System.out.println("[INFO] Operation status response: " + response.getInfoMessage());
+
+        if(response.getInfoMessage().equals(OperationStatusResponse.OPERATION_COMMITTED))
+        {
+            // Probably the original response was lost
+            // We are not waiting anymore
+            synchronized (mutexWaitingForOperationResponse)
+            {
+                waitingForOperationResponse = false;
             }
         }
     }
