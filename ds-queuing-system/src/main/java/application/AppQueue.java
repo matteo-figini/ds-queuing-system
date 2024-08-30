@@ -118,7 +118,7 @@ public class AppQueue {
             ret += clientName + ":" + idx + "; ";
         }
 
-        ret += "\n-----------";
+//        ret += "\n-----------";
 
         return ret;
     }

@@ -376,7 +376,6 @@ public class RaftNode {
 
         currentLeader = msg.leaderName;
         brokerController.setLeaderBroker(currentLeader);
-        System.out.println("[INFO] Received ask leader response, leader: " + currentLeader);
 
         if(currentLeader == null)
         {
@@ -851,7 +850,6 @@ public class RaftNode {
                 if(acks >= (NUM_NODES + 1) / 2)
                 {
                     // deliver log[commitLength].msg to the application
-                    System.out.println("[INFO] New log entry committed from commitLogEntries(): " + log.get(commitLength.get()).operation);
 
                     // TODO: this operation is heavy, should it be performed
                     //  by the raft thread or by the brokerController thread?

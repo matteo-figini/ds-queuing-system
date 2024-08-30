@@ -191,6 +191,8 @@ public class AppQueueManager {
             final AppQueue queue = mapQueues.get(queueName);
 
             System.out.println(queue.toString());
+
+            System.out.println("-------------------");
         }
     }
 }

@@ -182,7 +182,6 @@ public class BrokerController {
             }
         };
         raftThread.start();
-        System.out.println("[INFO] Raft thread started");
     }
 
     /**

@@ -309,7 +309,7 @@ public class ClientController {
     {
         if(response.getStatus())
         {
-            System.out.println("[INFO] Value from the queue: " + response.getElementsRead());
+            System.out.println("[INFO] Values from the queue: " + response.getElementsRead());
         }
         else
         {
