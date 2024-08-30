@@ -10,11 +10,26 @@ import messages.raft.RaftAppendMessage;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This class defines the logic of a Raft node.
  */
 public class RaftNode {
+
+    /**
+     * The possible status of an operation who's being
+     * taken care of by Raft.
+     */
+    public enum OperationStatus
+    {
+        /** Still not committed, but is taken care of.*/
+        PENDING,
+        /** Operation committed. */
+        COMMITTED,
+        /** The operation is not in the log. */
+        MISSING,
+    }
 
     /** Number of nodes in the raft network */
     private final Integer NUM_NODES;
@@ -57,9 +72,15 @@ public class RaftNode {
 
     /** Log of the node*/
     private ArrayList<LogItem> log = new ArrayList<>();
+    private final Object mutexLog = new Object();
 
-    /** TODO */
-    private Integer commitLength = 0;
+    /**
+     * TODO
+     *
+     * NOTE: AtomicInteger is enough because the only method accessible
+     * by another thread only reads the value of commitLength.
+     */
+    private AtomicInteger commitLength = new AtomicInteger(0);
 
     /** Id of the current leader node*/
     private String currentLeader = null;
@@ -163,15 +184,16 @@ public class RaftNode {
         currentRole = NodeState.FOLLOWER;
         currentTerm = 0;
         votedFor = null;
-        commitLength = 0;
+        commitLength.set(0);
         currentLeader = null;
 
         if (diskBackupHandler.logExists()) {
             recoverFromCrash();
         } else {
             // Save initial state to disk
-            diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
-            diskBackupHandler.saveLog(log);
+            diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
+
+            synchronized (mutexLog) { diskBackupHandler.saveLog(log); }
         }
 
         if(!netAlreadyStarted)
@@ -288,28 +310,32 @@ public class RaftNode {
         // Recover other state variables from log file
         currentTerm = 0;
         votedFor = null;
-        commitLength = 0;
-        log.clear();
-        try
+        commitLength.set(0);
+
+        synchronized (mutexLog)
         {
-            diskBackupHandler.loadLog(log);
+            log.clear();
+            try
+            {
+                diskBackupHandler.loadLog(log);
 
-            final LogFilesHandler<LogItem>.StatusStructure s = diskBackupHandler.loadStatus();
+                final LogFilesHandler<LogItem>.StatusStructure s = diskBackupHandler.loadStatus();
 
-            currentTerm = s.currentTerm;
-            votedFor = s.votedFor;
-            commitLength = s.commitLength;
+                currentTerm = s.currentTerm;
+                votedFor = s.votedFor;
+                commitLength.set(s.commitLength);
 
-            // Recreate the queues from the log
-            final List<Operation> listOperations = log.stream()
-                            .map(item -> item.operation)
-                            .toList(); // Get the list of operations
-            brokerController.recreateQueuesFromLog(listOperations);
-        }
-        catch (IOException e)
-        {
-            System.out.println(e.getMessage());
-            e.printStackTrace();
+                // Recreate the queues from the log
+                final List<Operation> listOperations = log.stream()
+                        .map(item -> item.operation)
+                        .toList(); // Get the list of operations
+                brokerController.recreateQueuesFromLog(listOperations);
+            }
+            catch (IOException e)
+            {
+                System.out.println(e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 
@@ -388,20 +414,25 @@ public class RaftNode {
         votesReceived.clear(); // TODO: I added this, is it actually needed?
         votesReceived.add(nodeId);
 
-        Integer lastTerm = 0;
-        if(!log.isEmpty())
-        {
-            lastTerm = log.get(log.size() - 1).term;
-        }
+//        Integer lastTerm = 0;
+//        if(!log.isEmpty())
+//        {
+//            lastTerm = log.get(log.size() - 1).term;
+//        }
 
-        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
 
         // send message to all nodes
         final VoteRequest voteMsg;
-        if(!log.isEmpty())
-            voteMsg = new VoteRequest(nodeId, currentTerm, log.size(), log.get(log.size() - 1).term);
-        else
-            voteMsg = new VoteRequest(nodeId, currentTerm, 0, 0);
+
+        synchronized (mutexLog)
+        {
+            if(!log.isEmpty())
+                voteMsg = new VoteRequest(nodeId, currentTerm, log.size(), log.get(log.size() - 1).term);
+            else
+                voteMsg = new VoteRequest(nodeId, currentTerm, 0, 0);
+        }
+
         brokerController.sendMessage(BrokerNetwork.ALL_BROKERS_CMD, voteMsg);
 
         // Start election timer
@@ -437,13 +468,17 @@ public class RaftNode {
         }
 
         Integer lastTerm = 0;
-        if(!log.isEmpty())
+        boolean logOk;
+        synchronized (mutexLog)
         {
-            lastTerm = log.get(log.size() - 1).term;
-        }
+            if(!log.isEmpty())
+            {
+                lastTerm = log.get(log.size() - 1).term;
+            }
 
-        boolean logOk = (cLogLastTerm > lastTerm) ||
-                (Objects.equals(cLogLastTerm, lastTerm) && cLogLength >= log.size());
+            logOk = (cLogLastTerm > lastTerm) ||
+                    (Objects.equals(cLogLastTerm, lastTerm) && cLogLength >= log.size());
+        }
 
         // True if this node voted for this candidate or none
         boolean votedForOk = votedFor == null || votedFor.equals(voteReq.cId);
@@ -477,7 +512,7 @@ public class RaftNode {
             timeoutHandlerElectionFollower.startNewTimeout();
         }
 
-        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
 
         final Message msg = new VoteResponse(nodeId, currentTerm, vote);
         brokerController.sendMessage(voteReq.cId, msg);
@@ -509,6 +544,12 @@ public class RaftNode {
 
             if(votesReceived.size() >= (NUM_NODES + 1) / 2)
             {
+                // Cancel election timer
+                timeoutHandlerElectionCandidate.disableAndRemove();
+                timeoutHandlerElectionFollower.disableAndRemove();
+                timeoutHandlerAskLeaderRequest.disableAndRemove();
+                timeoutHandlerLeaderDisconnected.disableAndRemove();
+
                 // Election won
                 System.out.println("[INFO] ELECTION WON");
 
@@ -516,18 +557,19 @@ public class RaftNode {
                 currentLeader = nodeId;
                 brokerController.setLeaderBroker(currentLeader);
 
-                // Cancel election timer
-                timeoutHandlerElectionCandidate.disableAndRemove();
-
-                // Send first message to each follower
-                for(String followerId : brokerController.getBrokersConnected())
+                synchronized (mutexLog)
                 {
-                    if(!Objects.equals(followerId, nodeId))
+                    // Send first message to each follower
+                    for(String followerId : brokerController.getBrokersConnected())
                     {
-                        sentLength.put(followerId, log.size());
-                        ackedLength.put(followerId, 0);
+                        if(!Objects.equals(followerId, nodeId))
+                        {
+                            sentLength.put(followerId, log.size());
 
-                        replicateLog(followerId);
+                            ackedLength.put(followerId, 0);
+
+                            replicateLog(followerId);
+                        }
                     }
                 }
 
@@ -547,7 +589,7 @@ public class RaftNode {
             timeoutHandlerElectionCandidate.disableAndRemove();
         }
 
-        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
     }
 
     /**
@@ -559,7 +601,7 @@ public class RaftNode {
      *
      * @param newOperation The operation to be added to the log.
      */
-    public void onAppendMessage(final Operation newOperation)
+    private void onAppendMessage(final Operation newOperation)
     {
         // Create new log item
         final LogItem newItem = new LogItem(newOperation, currentTerm);
@@ -570,20 +612,23 @@ public class RaftNode {
             throw new RuntimeException("Error, this function should be called only on the leader node");
         }
 
-        log.add(newItem);
-
-        // Update ackedLength of the leader
-        ackedLength.put(nodeId, log.size());
-
-        for(String followerId : brokerController.getBrokersConnected())
+        synchronized (mutexLog)
         {
-            if(!Objects.equals(followerId, nodeId)) // Avoid leader sending to himself
-            {
-                replicateLog(followerId);
-            }
-        }
+            log.add(newItem);
 
-        diskBackupHandler.saveLog(log);
+            // Update ackedLength of the leader
+            ackedLength.put(nodeId, log.size());
+
+            for(String followerId : brokerController.getBrokersConnected())
+            {
+                if(!Objects.equals(followerId, nodeId)) // Avoid leader sending to himself
+                {
+                    replicateLog(followerId);
+                }
+            }
+
+            diskBackupHandler.saveLog(log);
+        }
     }
 
     /**
@@ -603,16 +648,21 @@ public class RaftNode {
 
         int prefixLen = sentLength.getOrDefault(followerId, 0);
 
-        List<LogItem> suffix = new ArrayList<>(log.subList(prefixLen, log.size()));
-
-        int prefixTerm = 0;
-        if(prefixLen > 0)
+        List<LogItem> suffix;
+        int prefixTerm;
+        synchronized (mutexLog)
         {
-            prefixTerm = log.get(prefixLen - 1).term;
+            suffix = new ArrayList<>(log.subList(prefixLen, log.size()));
+
+            prefixTerm = 0;
+            if(prefixLen > 0)
+            {
+                prefixTerm = log.get(prefixLen - 1).term;
+            }
         }
 
         // send to followerId
-        Message msg = new LogRequest(currentLeader, currentTerm, prefixLen, prefixTerm, commitLength, suffix);
+        Message msg = new LogRequest(currentLeader, currentTerm, prefixLen, prefixTerm, commitLength.get(), suffix);
         brokerController.sendMessage(followerId, msg);
     }
 
@@ -646,8 +696,14 @@ public class RaftNode {
         }
 
         final Integer prefixLen = logRequest.prefixLen;
-        final boolean logOk = (log.size() >= prefixLen) &&
-                (prefixLen == 0 || Objects.equals(log.get(prefixLen - 1).term, logRequest.prefixTerm));
+
+        final boolean logOk;
+        synchronized (mutexLog)
+        {
+            logOk = (log.size() >= prefixLen) &&
+                    (prefixLen == 0 || Objects.equals(log.get(prefixLen - 1).term, logRequest.prefixTerm));
+        }
+
         if(logRequest.term.equals(currentTerm) && logOk)
         {
             appendEntries(prefixLen, logRequest.leaderCommit, logRequest.suffix);
@@ -663,7 +719,7 @@ public class RaftNode {
             brokerController.sendMessage(logRequest.leaderId, msg);
         }
 
-        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
     }
 
     /**
@@ -679,41 +735,44 @@ public class RaftNode {
         // TODO: this function should be called only by followers?
         //  Should I add an assertion for testing?
 
-        if(!suffix.isEmpty() && log.size() > prefixLen)
+        synchronized (mutexLog)
         {
-            int index = Math.min(log.size(), prefixLen + suffix.size()) - 1;
-            if(log.get(index).term != suffix.get(index - prefixLen).term)
+            if(!suffix.isEmpty() && log.size() > prefixLen)
             {
-                // log is inconsistent, keep only until prefixLen
-                // TODO: is it correct? the slides say to keep until `prefixLen - 1` included?
-                log = new ArrayList<>(log.subList(0, prefixLen));
-            }
-        }
-
-        if(prefixLen + suffix.size() > log.size())
-        {
-            for(int i = log.size() - prefixLen; i < suffix.size(); i++)
-            {
-                log.add(suffix.get(i));
-            }
-        }
-
-        if(leaderCommit > commitLength)
-        {
-            for(int i = commitLength; i < leaderCommit; i++)
-            {
-                // deliver log[i].msg to the application
-                System.out.println("[INFO] New log entry committed from appendEntries(): " + log.get(i).operation);
-
-                // TODO: this operation is heavy, should it be performed
-                //  by the raft thread or by the brokerController thread?
-                brokerController.commitOperationFollower(log.get(i).operation);
+                int index = Math.min(log.size(), prefixLen + suffix.size()) - 1;
+                if(log.get(index).term != suffix.get(index - prefixLen).term)
+                {
+                    // log is inconsistent, keep only until prefixLen
+                    // TODO: is it correct? the slides say to keep until `prefixLen - 1` included?
+                    log = new ArrayList<>(log.subList(0, prefixLen));
+                }
             }
 
-            commitLength = leaderCommit;
-        }
+            if(prefixLen + suffix.size() > log.size())
+            {
+                for(int i = log.size() - prefixLen; i < suffix.size(); i++)
+                {
+                    log.add(suffix.get(i));
+                }
+            }
 
-        diskBackupHandler.saveLog(log);
+            if(leaderCommit > commitLength.get())
+            {
+                for(int i = commitLength.get(); i < leaderCommit; i++)
+                {
+                    // deliver log[i].msg to the application
+                    System.out.println("[INFO] New log entry committed from appendEntries(): " + log.get(i).operation);
+
+                    // TODO: this operation is heavy, should it be performed
+                    //  by the raft thread or by the brokerController thread?
+                    brokerController.commitOperationFollower(log.get(i).operation);
+                }
+
+                commitLength.set(leaderCommit);
+            }
+
+            diskBackupHandler.saveLog(log);
+        }
     }
 
     /**
@@ -750,7 +809,7 @@ public class RaftNode {
 //            electionTimeoutHandler.stop();
         }
 
-        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength);
+        diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
 
         if(currentRole == NodeState.FOLLOWER)
         {
@@ -776,33 +835,36 @@ public class RaftNode {
         boolean keepGoing = true;
         boolean newMessaggesCommitted = false;
 
-        while(commitLength < log.size() && keepGoing)
+        synchronized (mutexLog)
         {
-            int acks = 1; // 1 because we already count the leader ack
-            for(String node : brokerController.getBrokersConnected())
+            while(commitLength.get() < log.size() && keepGoing)
             {
-                if(ackedLength.get(node) > commitLength)
+                int acks = 1; // 1 because we already count the leader ack
+                for(String node : brokerController.getBrokersConnected())
                 {
-                    acks++;
+                    if(ackedLength.get(node) > commitLength.get())
+                    {
+                        acks++;
+                    }
                 }
-            }
 
-            if(acks >= (NUM_NODES + 1) / 2)
-            {
-                // deliver log[commitLength].msg to the application
-                System.out.println("[INFO] New log entry committed from commitLogEntries(): " + log.get(commitLength).operation);
+                if(acks >= (NUM_NODES + 1) / 2)
+                {
+                    // deliver log[commitLength].msg to the application
+                    System.out.println("[INFO] New log entry committed from commitLogEntries(): " + log.get(commitLength.get()).operation);
 
-                // TODO: this operation is heavy, should it be performed
-                //  by the raft thread or by the brokerController thread?
-                brokerController.commitOperationLeader(log.get(commitLength).operation);
+                    // TODO: this operation is heavy, should it be performed
+                    //  by the raft thread or by the brokerController thread?
+                    brokerController.commitOperationLeader(log.get(commitLength.get()).operation);
 
-                commitLength++;
+                    commitLength.incrementAndGet(); // Only increment is needed
 
-                newMessaggesCommitted = true;
-            }
-            else
-            {
-                keepGoing = false;
+                    newMessaggesCommitted = true;
+                }
+                else
+                {
+                    keepGoing = false;
+                }
             }
         }
 
@@ -823,5 +885,46 @@ public class RaftNode {
                 }
             }
         }
+    }
+
+    /**
+     * Check if the operation is in the log and return its status.
+     * @param operation The operation to be checked.
+     * @return The status of the operation.
+     */
+    public OperationStatus checkOperationStatus(final Operation operation)
+    {
+        // NOTE: THIS FUNCTION IS CALLED FROM BrokerController'S THREAD
+        // ALL MEMBER VARIABLES USED HERE MUST BE THREAD SAFE
+
+        // NOTE2: Operations inside the log are time ordered ONLY BY
+        // CLIENT. This means that operations from the same client
+        // are time ordered. OPERATIONS FROM DIFFERENT CLIENTS
+        // MIGHT BE TIME ORDERED!
+
+        synchronized (mutexLog)
+        {
+            for(int i = log.size() - 1; i >= 0; i--)
+            {
+                final Operation logOp = log.get(i).operation;
+
+                if(logOp.equals(operation))
+                {
+                    // The operation was found in the log
+                    if(i < commitLength.get()) return OperationStatus.COMMITTED;
+                    else return OperationStatus.PENDING;
+                }
+
+                if(logOp.sameClient(operation) && logOp.happenedBefore(operation))
+                {
+                    // We found an operation FROM THE SAME CLIENT
+                    // that happened before the one we're looking for
+                    return OperationStatus.MISSING;
+                }
+            }
+        }
+
+        // Nothing was found
+        return OperationStatus.MISSING;
     }
 }
