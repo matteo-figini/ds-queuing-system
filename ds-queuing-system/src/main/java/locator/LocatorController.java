@@ -66,12 +66,19 @@ public class LocatorController {
      * @param senderReference The {@code NodeHandler} representing the reference to the connected node.
      */
     public void onHelloRequestMessage (HelloRequestMessage message, NodeHandler senderReference) {
-        ScheduledExecutorService startRunning = Executors.newSingleThreadScheduledExecutor();
         senderReference.setNodeName(message.getNodeName());
         System.out.println("[INFO] Set node name: " + senderReference.getNodeName());
-        if (message.isBroker() && brokersConnected >= maximumBrokersNumber) {
+
+        // Check that the name is unique. The name should be unique among all the connected nodes.
+        if (isNameAlreadyInUseByAnotherNode(message.getNodeName())) {
+            System.out.println("[ERROR] Name " + message.getNodeName() + " already in use by another node.");
+            senderReference.sendMessage(new HelloResponseMessage(true, true));
+        } else if (message.isBroker() && brokersConnected >= maximumBrokersNumber) {
             System.out.println("[ERROR] Number of maximum brokers already reached: unable to connect " + message.getNodeName());
-            senderReference.sendMessage(new HelloResponseMessage(false));
+            senderReference.sendMessage(new HelloResponseMessage(false, false));
+        } else if (!message.isBroker() && networkState == NetworkState.CONNECTING_BROKERS) {
+            System.out.println("[ERROR] Clients cannot connect to the network while brokers are still connecting.");
+            senderReference.sendMessage(new HelloResponseMessage(false, false));
         } else {
             // When a node connects to the locator:
             // - Set the name of the connected node
@@ -87,8 +94,7 @@ public class LocatorController {
             System.out.println(message.isBroker() ?
                     "[INFO] Added new broker: " + nodeReference :
                     "[INFO] Added new client: " + nodeReference);
-            System.out.println(nodesConnected);
-            senderReference.sendMessage(new HelloResponseMessage(true));
+            senderReference.sendMessage(new HelloResponseMessage(true, false));
         }
     }
 
@@ -183,5 +189,19 @@ public class LocatorController {
         leader = nodesConnected.stream()
                 .filter(nodeReference -> nodeReference.isBroker() && nodeReference.nodeName().equals(leaderBroker))
                 .findFirst().orElse(this.leader);
+    }
+
+    /**
+     * Search if there exists another node with the same name.
+     * @param nodeName Name to be compared to.
+     * @return {@code true} if the node name is already used, {@code false} otherwise.
+     */
+    private boolean isNameAlreadyInUseByAnotherNode (String nodeName) {
+        for (NodeReference node : nodesConnected) {
+            if (node.nodeName().equals(nodeName)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

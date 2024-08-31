@@ -47,6 +47,9 @@ public class BrokerServerSocket implements Runnable {
                 thread.start();
             } catch (IOException e) {
                 System.out.println("[EXCEPTION] " + e.getMessage());
+            } catch (NullPointerException e) {
+                System.out.println("[EXCEPTION] Port " + publicPort + " is already in use! The program will (hopefully, gracefully) end.");
+                System.exit(1);
             }
         }
     }

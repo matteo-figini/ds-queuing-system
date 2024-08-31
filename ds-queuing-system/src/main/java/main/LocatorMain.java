@@ -12,13 +12,18 @@ import java.util.Scanner;
  * - The number of the brokers in the network.
  */
 public class LocatorMain {
+    public static int MIN_PORT = 1024;
+    public static int MAX_PORT = 65535;
+
     public static void main(String[] args) {
-        int brokers;
+        int brokers, locatorPort;
         Scanner scanner = new Scanner(System.in);
 
         // Insert the port on which the locator is listening to
-        System.out.print("Locator's port: ");
-        int locatorPort = Integer.parseInt(scanner.nextLine());
+        do {
+            System.out.print("Locator's port (range " + MIN_PORT + "-" + MAX_PORT + "): ");
+            locatorPort = Integer.parseInt(scanner.nextLine());
+        } while (!isValidPort(locatorPort));
 
         // Insert the number of brokers allowed in the network
         do {
@@ -31,5 +36,15 @@ public class LocatorMain {
         locatorController.setLocatorNetwork(locatorNetwork);
         Thread thread = new Thread(locatorNetwork);
         thread.start();
+    }
+
+    /**
+     * Returns true if the port specified as parameter is a valid port, otherwise it returns false.
+     * Port must be included in the range [1024, 65536) to be valid.
+     * @param port The port required to be checked.
+     * @return {@code true} if the port is valid, {@code false} otherwise.
+     */
+    public static boolean isValidPort (int port) {
+        return (port >= MIN_PORT && port <= MAX_PORT);
     }
 }

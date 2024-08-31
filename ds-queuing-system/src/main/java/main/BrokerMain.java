@@ -13,6 +13,9 @@ import java.util.regex.Pattern;
  * This class handles the instantiation of a single broker.
  */
 public class BrokerMain {
+    public static int MIN_PORT = 1024;
+    public static int MAX_PORT = 65535;
+
     public static void main(String[] args) {
         // Ask the user the address and the port of the locator
         String locatorIPAddress = askIPAddress("Insert the IP address of the locator: ");
@@ -114,6 +117,6 @@ public class BrokerMain {
      * @return {@code true} if the port is valid, {@code false} otherwise.
      */
     public static boolean isValidPort (int port) {
-        return (port >= 1024 && port < 65536);
+        return (port >= MIN_PORT && port <= MAX_PORT);
     }
 }

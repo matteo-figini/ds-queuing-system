@@ -7,7 +7,6 @@ import messages.network.*;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
-import java.util.Objects;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,7 +17,7 @@ import java.util.concurrent.TimeUnit;
  * This class handles the logic of the client of the network.
  */
 public class ClientController {
-    private final String clientName;
+    private String clientName;
     private ClientNetwork clientNetwork;
     private final ExecutorService keyboardInputRoutine = Executors.newSingleThreadExecutor();
     private CommandInterpreter commandInterpreter;
@@ -175,12 +174,19 @@ public class ClientController {
      * @param sender Sender of the message (the locator should be the sender of the message).
      */
     private void onHelloResponseMessage (HelloResponseMessage message, String sender) {
-        if (message.isConnectionAccepted()) {
+        if (message.isConnectionNotAccepted()) {
+            System.out.println("[ERROR] Cannot connect as a broker to the locator.");
+            System.out.println("It's safe to close the program now.");
+            return;
+        }
+        if (message.isNameAlreadyInUse()) {
+            System.out.print("[ERROR] The chosen name is already in use, please select another name: ");
+            Scanner scanner = new Scanner(System.in);
+            this.clientName = scanner.nextLine();
+            startCommunicationGreetings();
+        } else {
             System.out.println("[INFO] From " + sender + ": connection to the locator accepted.");
             clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest());
-        } else {
-            System.out.println("[ERROR] Cannot connect as a client to the locator.");
-            System.exit(0);
         }
     }
 

@@ -23,9 +23,6 @@ import raft.RaftNode;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -35,7 +32,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * and acting as a mediator between the application layer and the network layer.
  */
 public class BrokerController {
-    private final String brokerName;
+    private String brokerName;
     private final String localIPAddress;
     private BrokerNetwork brokerNetwork;
 
@@ -73,7 +70,7 @@ public class BrokerController {
     public void startCommunicationGreetings () {
         int publicPort = brokerNetwork.getBrokerPublicPort();
         HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, publicPort, this.brokerName, true);
-        brokerNetwork.sendMessage("locator", helloMessage);
+        sendMessage("locator", helloMessage);
     }
 
     /**
@@ -125,11 +122,18 @@ public class BrokerController {
      * @param message Message received.
      */
     private void onHelloResponseMessage (HelloResponseMessage message) {
-        if (message.isConnectionAccepted()) {
-            sendMessage("locator", new NetDiscoveryRequestMessage());
-        } else {
+        if (message.isConnectionNotAccepted()) {
             System.out.println("[ERROR] Cannot connect as a broker to the locator.");
-            System.exit(0);
+            System.out.println("It's safe to close the program now.");
+            return;
+        }
+        if (message.isNameAlreadyInUse()) {
+            System.out.print("[ERROR] The chosen name is already in use, please select another name: ");
+            Scanner scanner = new Scanner(System.in);
+            this.brokerName = scanner.nextLine();
+            startCommunicationGreetings();
+        } else {
+            sendMessage("locator", new NetDiscoveryRequestMessage());
         }
     }
 
@@ -185,10 +189,12 @@ public class BrokerController {
     }
 
     /**
-     * Handle the disconnection of the code. If the disconnected node was the broker's leader, remove the reference.
+     * Handle the disconnection of the code and remove the reference of the node from the map of connected nodes.
+     * If the disconnected node was the broker's leader, remove the reference.
      * @param disconnectedNode Name of the disconnected node.
      */
     public void handleDisconnection (String disconnectedNode) {
+        nodesConnected.remove(disconnectedNode);
         if (this.leaderBroker != null && this.leaderBroker.equals(disconnectedNode)) {
             this.leaderBroker = null;
             System.out.println("[INFO] Leader broker disconnected.");
