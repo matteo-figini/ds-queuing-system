@@ -94,6 +94,7 @@ public class LocatorController {
             System.out.println(message.isBroker() ?
                     "[INFO] Added new broker: " + nodeReference :
                     "[INFO] Added new client: " + nodeReference);
+            System.out.println("[INFO] Brokers connected: " + brokersConnected + ", nodes connected: " + nodesConnected.size());
             senderReference.sendMessage(new HelloResponseMessage(true, false));
         }
     }
@@ -166,8 +167,8 @@ public class LocatorController {
         nodesConnected.stream().filter(node -> node.isBroker() && node.nodeName().equals(nodeHandler.getNodeName())).forEach(node -> brokersConnected--);
         // Remove the node from the list "nodesConnected" and from the hashmap "nodeHandlers".
         nodesConnected.removeIf(node -> node.nodeName().equals(nodeHandler.getNodeName()));
-        System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\" from the locator.");
-        System.out.println("[INFO] Brokers connected: " + brokersConnected);
+        System.out.println("[INFO] Removed NodeHandler of node \"" + nodeHandler.getNodeName() + "\".");
+        System.out.println("[INFO] Brokers connected: " + brokersConnected + ", nodes connected: " + nodesConnected.size());
 
         // It might happen that there are not enough nodes in the network to have a successful election, in that case
         // there is no leader in the network.

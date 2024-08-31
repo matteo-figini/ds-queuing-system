@@ -175,8 +175,8 @@ public class ClientController {
      */
     private void onHelloResponseMessage (HelloResponseMessage message, String sender) {
         if (message.isConnectionNotAccepted()) {
-            System.out.println("[ERROR] Cannot connect as a broker to the locator.");
-            System.out.println("It's safe to close the program now.");
+            System.out.println("[ERROR] Cannot connect as a client to the locator, the program will (hopefully, gracefully) end.");
+            System.exit(2);
             return;
         }
         if (message.isNameAlreadyInUse()) {

@@ -89,7 +89,6 @@ public class NodeHandler implements Runnable {
                 System.out.println("[INFO] Sending message: " + message.toString() + ", to node: " + clientSocket.getInetAddress());
                 outputStream.writeObject(message);
                 outputStream.flush();
-                System.out.println("[INFO] Message sent.");
             }
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to send message: " + e.getMessage());

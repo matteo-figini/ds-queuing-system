@@ -27,7 +27,7 @@ public class LocatorMain {
 
         // Insert the number of brokers allowed in the network
         do {
-            System.out.print("Number of brokers in the network: ");
+            System.out.print("Number of brokers in the network (odd number, greater than 1): ");
             brokers = Integer.parseInt(scanner.nextLine());
         } while (brokers <= 1 || brokers % 2 == 0);
 
