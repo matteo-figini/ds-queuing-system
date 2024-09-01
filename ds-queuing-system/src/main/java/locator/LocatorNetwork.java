@@ -1,14 +1,12 @@
 package locator;
 
 import messages.Message;
-import misc.NodeReference;
+import misc.NetworkUtils;
 
 import java.io.IOException;
-import java.net.Inet4Address;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class handles all the network communication by the locator component.
@@ -20,7 +18,7 @@ public class LocatorNetwork implements Runnable {
     private ServerSocket serverSocket;
 
     // This HashMap contains a reference to all the nodes (brokers & clients) currently connected
-    private final Map<String, NodeHandler> nodeHandlers = new HashMap<>();
+    private final ConcurrentHashMap<String, NodeHandler> nodeHandlers = new ConcurrentHashMap<>();
 
     /**
      * Set the default parameters needed for running the locator.
@@ -40,8 +38,8 @@ public class LocatorNetwork implements Runnable {
     public void run() {
         try {
             this.serverSocket = new ServerSocket(this.port);
-            System.out.println("[INFO] Locator's network listening on " + Inet4Address.getLocalHost().getHostAddress() +
-                    ":" + this.port + " via TCP socket connection.");
+            System.out.println("[INFO] Locator's network listening on " + NetworkUtils.retrieveAutomaticallyIPAddress() +
+                    ":" + this.port);
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to start the locator's server socket.");
             System.out.println(e.getMessage());
