@@ -3,8 +3,8 @@ package main;
 import broker.BrokerController;
 import broker.BrokerNetwork;
 
-import java.net.Inet4Address;
-import java.net.UnknownHostException;
+import java.net.*;
+import java.util.Enumeration;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,11 +18,11 @@ public class BrokerMain {
 
     public static void main(String[] args) {
         // Ask the user the address and the port of the locator
-        String locatorIPAddress = askIPAddress("Insert the IP address of the locator: ");
+        String locatorIPAddress = askIPAddress();
         int locatorPort = askPort("Insert the port of the locator: ");
-        String brokerName = askString("Insert the broker name: ");
+        String brokerName = askBrokerName();
         int publicPort = askPort("Insert the public port on which the broker will listen to new connections: ");
-        String personalIPAddress = retrieveIPAddress();
+        String personalIPAddress = retrieveAutomaticallyIPAddress();
 
         BrokerController brokerController = new BrokerController(brokerName, personalIPAddress);
         BrokerNetwork brokerNetwork = new BrokerNetwork(brokerController, locatorIPAddress, locatorPort, publicPort);
@@ -32,14 +32,14 @@ public class BrokerMain {
 
     /**
      * Takes in input a generic value for the IP address and checks that it is valid.
-     * @param outMessage Command message to be printed.
+     *
      * @return The inserted IP address.
      */
-    private static String askIPAddress (String outMessage) {
+    private static String askIPAddress () {
         Scanner scanner = new Scanner(System.in);
         String ipAddress;
         do {
-            System.out.print(outMessage);
+            System.out.print("Insert the IP address of the locator: ");
             ipAddress = scanner.nextLine();
         } while (!isValidIPAddress(ipAddress));
         return ipAddress;
@@ -61,23 +61,22 @@ public class BrokerMain {
     }
 
     /**
-     * Takes in input a generic string from stdin.
-     * @param outMessage Command message to be printed.
+     * Takes in input a generic string from stdin that represents the proposed broker name.
      * @return The inserted string.
      */
-    private static String askString (String outMessage) {
+    private static String askBrokerName() {
         Scanner scanner = new Scanner(System.in);
-        System.out.print(outMessage);
+        System.out.print("Insert the broker name: ");
         return scanner.nextLine();
     }
 
     /**
-     * Retrieve the local IP address found by the {@code Inet4Address} class. It is possible to change the IP address
-     * in case the local IP address belongs to another network interface.
+     * Retrieve the local IP address found by the {@code InetAddress} class.
+     * It is possible to change the IP address in case the local IP address belongs to another network interface.
      * @return The IP address chosen to be visible from outside.
      */
-    private static String retrieveIPAddress () {
-        String localIPAddress, alternativeIPAddress = null;
+    private static String retrieveManuallyIPAddress () {
+        String localIPAddress, alternativeIPAddress;
         Scanner scanner = new Scanner(System.in);
         try {
             localIPAddress = Inet4Address.getLocalHost().getHostAddress();
@@ -91,6 +90,32 @@ public class BrokerMain {
         }
         System.out.println("[INFO] Local IP Address: " + localIPAddress);
         return localIPAddress;
+    }
+
+    /**
+     * Retrieve automatically the local IP address found by the {@code InetAddress} class.
+     * @return The IP address chosen to be visible from outside.
+     */
+    private static String retrieveAutomaticallyIPAddress () {
+        try {
+            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+            while (networkInterfaces.hasMoreElements()) {
+                NetworkInterface networkInterface = networkInterfaces.nextElement();
+                if (!networkInterface.isUp() || networkInterface.isLoopback())
+                    continue;
+                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (address.isLinkLocalAddress())
+                        continue;
+                    if (address.isSiteLocalAddress())
+                        return address.getHostAddress();
+                }
+            }
+        } catch (SocketException e) {
+            System.out.println("[EXCEPTION] " + e.getMessage());
+        }
+        return null;
     }
 
     /**
@@ -112,7 +137,7 @@ public class BrokerMain {
 
     /**
      * Returns true if the port specified as parameter is a valid port, otherwise it returns false.
-     * Port must be included in the range [1024, 65536) to be valid.
+     * Port must be included in the range [1024, 65535] to be valid.
      * @param port The port required to be checked.
      * @return {@code true} if the port is valid, {@code false} otherwise.
      */
