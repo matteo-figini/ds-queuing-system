@@ -66,6 +66,7 @@ public class LocatorController {
      * @param senderReference The {@code NodeHandler} representing the reference to the connected node.
      */
     public void onHelloRequestMessage (HelloRequestMessage message, NodeHandler senderReference) {
+        // Set the name of the connected node
         senderReference.setNodeName(message.getNodeName());
         System.out.println("[INFO] Set node name: " + senderReference.getNodeName());
 
@@ -74,23 +75,20 @@ public class LocatorController {
             System.out.println("[ERROR] Name " + message.getNodeName() + " already in use by another node.");
             senderReference.sendMessage(new HelloResponseMessage(true, true));
         } else if (message.isBroker() && brokersConnected >= maximumBrokersNumber) {
+            // The maximum number of brokers allowed is already reached.
             System.out.println("[ERROR] Number of maximum brokers already reached: unable to connect " + message.getNodeName());
-            senderReference.sendMessage(new HelloResponseMessage(false, false));
-        } else if (!message.isBroker() && networkState == NetworkState.CONNECTING_BROKERS) {
-            System.out.println("[ERROR] Clients cannot connect to the network while brokers are still connecting.");
             senderReference.sendMessage(new HelloResponseMessage(false, false));
         } else {
             // When a node connects to the locator:
-            // - Set the name of the connected node
-            // - Add the corresponding NodeHandler to the map associating the name to the NodeHandler;
-            // - Create a NodeReference and add it to the list.
+            // - Add the corresponding NodeHandler to the map associating the name to the NodeHandler
+            // - Create a NodeReference and add it to the list
             locatorNetworkRef.addNodeHandler(senderReference.getNodeName(), senderReference);
-            if (message.isBroker()) brokersConnected++;
-            NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(),
-                    message.getNodePublicPort(),
-                    message.getNodeName(),
-                    message.isBroker());
+            if (message.isBroker())
+                brokersConnected++;
+            NodeReference nodeReference = new NodeReference(message.getNodeIPAddress(), message.getNodePublicPort(),
+                    message.getNodeName(), message.isBroker());
             nodesConnected.add(nodeReference);
+
             System.out.println(message.isBroker() ?
                     "[INFO] Added new broker: " + nodeReference :
                     "[INFO] Added new client: " + nodeReference);
