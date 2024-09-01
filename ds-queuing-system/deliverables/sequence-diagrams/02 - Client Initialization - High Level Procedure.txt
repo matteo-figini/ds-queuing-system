@@ -1,0 +1,33 @@
+@startuml
+
+title Client Initialization - High Level Procedure
+
+participant Client as C
+participant Locator as L
+
+activate C
+C -> L: Connect (IP, port)
+activate L
+L --> C: Connection accepted
+
+C -> L: HelloRequestMessage (IPAddress, nodeName, isBroker = false)
+alt nodeName unique
+L --> C: HelloResponseMessage (connectionAccepted = true)
+else 
+L --> C: HelloResponseMessage (connectionAccepted = false)
+note over L
+In this case, both locator
+and client must close the
+connection.
+end note
+end
+C -> L: LeaderDiscoveryRequest()
+note over L
+Send the name, the IP address and 
+the port of the current leader.
+end note
+L --> C: LeaderDiscoveryResponse (Broker)
+deactivate L
+deactivate C
+
+@enduml
