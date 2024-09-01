@@ -79,8 +79,6 @@ public class ClientController {
             System.out.println("[EXCEPTION] Unable to retrieve the local IP address: " + e.getMessage());
             System.out.println("[EXCEPTION] Adding the default address: " + localIPAddress);
         }
-        // Start the thread that continuously waits for new inputs and process them as commands.
-        keyboardInputRoutine.execute(this::inputRoutine);
         // Field "nodePublicPort" is not relevant
         HelloRequestMessage helloMessage = new HelloRequestMessage(this.localIPAddress, 0, clientName, false);
         clientNetwork.sendMessage("locator", helloMessage);
@@ -180,12 +178,12 @@ public class ClientController {
             return;
         }
         if (message.isNameAlreadyInUse()) {
-            System.out.print("[ERROR] The chosen name is already in use, please select another name: ");
-            Scanner scanner = new Scanner(System.in);
-            this.clientName = scanner.nextLine();
-            startCommunicationGreetings();
+            System.out.print("[ERROR] The chosen name is already in use, please restart the program selecting another name.");
+            System.exit(3);
         } else {
             System.out.println("[INFO] From " + sender + ": connection to the locator accepted.");
+            // Start the thread that continuously waits for new inputs and process them as commands.
+            keyboardInputRoutine.execute(this::inputRoutine);
             clientNetwork.sendMessage("locator", new LeaderDiscoveryRequest());
         }
     }
