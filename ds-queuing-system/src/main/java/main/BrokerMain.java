@@ -18,7 +18,7 @@ public class BrokerMain {
         int locatorPort = askPort("Insert the port of the locator: ");
         String brokerName = askBrokerName();
         int publicPort = askPort("Insert the public port on which the broker will listen to new connections: ");
-        String personalIPAddress = retrieveManuallyIPAddress();
+        String personalIPAddress = retrieveIPAddress();
 
         BrokerController brokerController = new BrokerController(brokerName, personalIPAddress);
         BrokerNetwork brokerNetwork = new BrokerNetwork(brokerController, locatorIPAddress, locatorPort, publicPort);

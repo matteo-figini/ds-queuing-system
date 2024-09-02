@@ -38,7 +38,7 @@ public class LocatorNetwork implements Runnable {
     public void run() {
         try {
             this.serverSocket = new ServerSocket(this.port);
-            System.out.println("[INFO] Locator's network listening on " + NetworkUtils.retrieveAutomaticallyIPAddress() +
+            System.out.println("[INFO] Locator's network listening on " + NetworkUtils.retrieveIPAddress() +
                     ":" + this.port);
         } catch (IOException e) {
             System.out.println("[EXCEPTION] Unable to start the locator's server socket.");

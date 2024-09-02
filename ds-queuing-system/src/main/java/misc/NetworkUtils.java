@@ -46,10 +46,14 @@ public class NetworkUtils {
      * It is possible to change the IP address in case the local IP address belongs to another network interface.
      * @return The IP address chosen to be visible from outside.
      */
-    public static String retrieveManuallyIPAddress () {
+    public static String retrieveIPAddress () {
         String localIPAddress, alternativeIPAddress;
         Scanner scanner = new Scanner(System.in);
-        localIPAddress = retrieveAutomaticallyIPAddress();
+        try {
+            localIPAddress = Inet4Address.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+            localIPAddress = "127.0.0.1";
+        }
         System.out.print("[INFO] Proposed local IP Address: " + localIPAddress + ". Insert another IP address (or press ENTER to confirm): ");
         alternativeIPAddress = scanner.nextLine();
         if (alternativeIPAddress != null && !alternativeIPAddress.equalsIgnoreCase("")) {
@@ -57,31 +61,5 @@ public class NetworkUtils {
         }
         System.out.println("[INFO] Local IP Address: " + localIPAddress);
         return localIPAddress;
-    }
-
-    /**
-     * Retrieve automatically the local IP address found by the {@code InetAddress} class.
-     * @return The IP address chosen to be visible from outside.
-     */
-    public static String retrieveAutomaticallyIPAddress () {
-        try {
-            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
-            while (networkInterfaces.hasMoreElements()) {
-                NetworkInterface networkInterface = networkInterfaces.nextElement();
-                if (!networkInterface.isUp() || networkInterface.isLoopback())
-                    continue;
-                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address.isLinkLocalAddress())
-                        continue;
-                    if (address.isSiteLocalAddress())
-                        return address.getHostAddress();
-                }
-            }
-        } catch (SocketException e) {
-            System.out.println("[EXCEPTION] " + e.getMessage());
-        }
-        return null;
     }
 }
