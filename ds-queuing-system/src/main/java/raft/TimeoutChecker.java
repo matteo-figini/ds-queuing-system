@@ -58,7 +58,7 @@ public class TimeoutChecker
      */
     private static final Integer sleepPeriod = 50;
 
-    private final Mode mode;
+    private Mode mode;
 
     /**
      * This boolean is set to true when the expected event
@@ -155,22 +155,25 @@ public class TimeoutChecker
      * Class constructor.
      *
      * @param eventsQueue The queue where the timeout event is eventually pushed.
-     * @param timeoutMillis The timeout to be checked, in milliseconds.
-     * @param timeoutEvent The event to send in case of timeout.
      */
-    public TimeoutChecker(LinkedBlockingQueue<Message> eventsQueue, int timeoutMillis, Message timeoutEvent, Mode mode)
+    public TimeoutChecker(LinkedBlockingQueue<Message> eventsQueue)
     {
         this.eventsQueue = eventsQueue;
-        this.timeout = timeoutMillis;
-        this.timeoutEvent = timeoutEvent;
-        this.mode = mode;
+
+        this.timeout = 0;
+        this.timeoutEvent = null;
+        this.mode = null;
     }
 
     /**
      * Start signal for the timeout checker. If already running
      * the timeout is stopped and a new one is started.
+     *
+     * @param timeoutMillis The timeout to be checked, in milliseconds.
+     * @param timeoutEvent The event to send in case of timeout.
+     * @param mode TODO
      */
-    public void startNewTimeout()
+    public void startNewTimeout(final int timeoutMillis, final Message timeoutEvent, final Mode mode)
     {
         if(isRunning())
         {
@@ -178,6 +181,12 @@ public class TimeoutChecker
             disableAndRemove();
         }
 
+        this.timeout = timeoutMillis;
+        this.timeoutEvent = timeoutEvent;
+        this.mode = mode;
+
+        // No need to sync with the mutex, as the thread
+        // shouldn't be running
         eventReceived = false;
         stopFlag = false;
         running = false;
