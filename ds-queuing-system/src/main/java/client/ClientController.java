@@ -18,9 +18,9 @@ import java.util.concurrent.TimeUnit;
  */
 public class ClientController {
     private String clientName;
-    private ClientNetwork clientNetwork;
-    private final ExecutorService keyboardInputRoutine = Executors.newSingleThreadExecutor();
-    private CommandInterpreter commandInterpreter;
+    protected ClientNetwork clientNetwork;
+    protected final ExecutorService keyboardInputRoutine = Executors.newSingleThreadExecutor();
+    protected CommandInterpreter commandInterpreter;
 
     private String localIPAddress;
 
@@ -30,8 +30,8 @@ public class ClientController {
      * In case the network's leader is missing it is not possible to send
      * a new request.
      */
-    private boolean connectedToLeader = false;
-    private final Object mutexConnectedToLeader = new Object();
+    protected boolean connectedToLeader = false;
+    protected final Object mutexConnectedToLeader = new Object();
 
     /**
      * True if I've already sent an operation request, and I'm
@@ -40,8 +40,8 @@ public class ClientController {
      * In that case it's not possible to send a new command
      * until we've received a response for the current one.
      */
-    private boolean waitingForOperationResponse = false;
-    private final Object mutexWaitingForOperationResponse = new Object();
+    protected boolean waitingForOperationResponse = false;
+    protected final Object mutexWaitingForOperationResponse = new Object();
 
     /**
      * Copy of the last request sent to the leader of the network.
@@ -88,7 +88,7 @@ public class ClientController {
      * Code of the thread that continuously waits for new inputs
      * and process them as commands.
      */
-    private void inputRoutine()
+    protected void inputRoutine()
     {
         Scanner scanner = new Scanner(System.in);
         while (!keyboardInputRoutine.isShutdown()) {
@@ -283,7 +283,7 @@ public class ClientController {
                 1, TimeUnit.SECONDS);
     }
 
-    private void onCreateQueueResponse(final CreateQueueResponse response)
+    protected void onCreateQueueResponse(final CreateQueueResponse response)
     {
         if(response.getStatus())
         {

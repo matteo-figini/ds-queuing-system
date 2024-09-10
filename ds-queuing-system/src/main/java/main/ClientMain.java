@@ -36,7 +36,7 @@ public class ClientMain {
      *
      * @return The inserted port.
      */
-    private static int askPort () {
+    public static int askPort () {
         Scanner scanner = new Scanner(System.in);
         int port;
         do {
