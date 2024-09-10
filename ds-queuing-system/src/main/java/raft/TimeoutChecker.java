@@ -18,17 +18,18 @@ public class TimeoutChecker
      */
     public enum Mode
     {
-        /** Stops when a timeout is reached or eventReceived() is called or
-         * stop() is called.*/
-        // Removed because I've removed eventReceived()
+        /**
+         * Stops when a timeout is reached or eventReceived() is called or
+         * stop() is called.
+         */
 //        SINGLE,
+        // Removed because I've removed eventReceived()
 
-        /** Stop the timeout procedure once a timeout event is reached or
-         * stop() is called. */
+        /**
+         * Stop the timeout procedure once a timeout event is reached or
+         * stop() is called.
+         */
         EXPLICIT,
-
-        /** Keep the procedure going. It might generate multiple events. */
-//        MULTIPLE,
     }
 
     /**
