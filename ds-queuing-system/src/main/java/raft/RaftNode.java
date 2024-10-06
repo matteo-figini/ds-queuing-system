@@ -129,6 +129,7 @@ public class RaftNode {
             synchronized (mutexLog) { diskBackupHandler.saveLog(log); }
         }
 
+        // TODO: Just start heartbeat timeout
         if(!netAlreadyStarted)
         {
             // If the network isn't already running there is no leader,
@@ -274,6 +275,8 @@ public class RaftNode {
 
     private void askLeader()
     {
+        // TODO: remove this method
+
         brokerController.sendMessage(BrokerNetwork.ALL_BROKERS_CMD, (Message) new AskLeaderRequest(nodeId));
 
         // Start timeout
@@ -282,6 +285,8 @@ public class RaftNode {
 
     private void onAskLeaderRequest(final AskLeaderRequest msg)
     {
+        // TODO: remove this method
+
         final AskLeaderResponse response = new AskLeaderResponse(currentLeader);
 
         brokerController.sendMessage(msg.sender, response);
@@ -297,6 +302,8 @@ public class RaftNode {
 
     private void onAskLeaderResponse(final AskLeaderResponse msg)
     {
+        // TODO: remove this method
+
         if(currentLeader != null)
         {
             // This node has already received the info from
@@ -324,6 +331,8 @@ public class RaftNode {
      */
     private void onLeaderDisconnection()
     {
+        // TODO: remove this method
+
         // The leader has disconnected. I start a timeout (which is random)
         // that might trigger an election if this node doesn't receive
         // a vote request before the timeout fires.
@@ -428,6 +437,8 @@ public class RaftNode {
 
         if(vote)
         {
+            // TODO: check if actually needed, compare with original algo
+
             // The vote is positive (check, this part was probably added
             // by me)
 
@@ -452,6 +463,9 @@ public class RaftNode {
 
         if(!vote && currentRole != NodeState.LEADER)
         {
+            // TODO: probably added by me, check if it
+            //  is actually needed
+
             // The vote is negative, for some reason the
             // candidate is not suitable -> I try myself
             // TODO: should I check if this node wasn't already
@@ -517,6 +531,10 @@ public class RaftNode {
 
             // Cancel election timer
             timeoutManager.stopTimeout();
+
+            // TODO: should I start a new timeout? leaving the node
+            //  with all timeouts stopped would prevent it to candidate
+            //  forever... not what i want
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
@@ -536,9 +554,9 @@ public class RaftNode {
         // Create new log item
         final LogItem newItem = new LogItem(newOperation, currentTerm);
 
-        // TODO: remove this check
         if(currentRole != NodeState.LEADER)
         {
+            // TODO: is it possible that this function is called when a node isn't the leader?
             throw new RuntimeException("Error, this function should be called only on the leader node");
         }
 
@@ -573,6 +591,7 @@ public class RaftNode {
         // TODO: remove this check
         if(currentRole != NodeState.LEADER)
         {
+            // TODO: is it possible that this function is called when a node isn't the leader?
             throw new RuntimeException("Error, this function should be called only on the leader node");
         }
 
@@ -671,6 +690,8 @@ public class RaftNode {
                 {
                     // log is inconsistent, keep only until prefixLen
                     // TODO: is it correct? the slides say to keep until `prefixLen - 1` included?
+                    //  maybe this would explain why it takes multiple iterations for correcting the log
+                    //  when a leader crashes before sending an operation to its followers... check
                     log = new ArrayList<>(log.subList(0, prefixLen));
                 }
             }
@@ -733,6 +754,7 @@ public class RaftNode {
 
             // Cancel election timer
             // TODO: check, why should i stop election timer in the leader?
+            //  shouldn't i start a new follower heartbeat timeout?
 //            electionTimeoutHandler.stop();
         }
 
@@ -740,6 +762,10 @@ public class RaftNode {
 
         if(currentRole == NodeState.FOLLOWER)
         {
+            // TODO: added by me, decide what to do. Should i keep this or
+            //  start a follower heartbeat timeout as explained in the
+            //  previous todo?
+
             // We received the response from a follower
             // that has better rights to be the leader, so
             // we switched to follower...
@@ -805,6 +831,11 @@ public class RaftNode {
             // get notified by the heartbeat, but we removed it
             for(String followerId : brokerController.getBrokersConnected())
             {
+                // TODO: this was added by me, so that operations are
+                //  immediately propagated to followers... but with the
+                //  heartbeat should I just wait the next "send heartbeat
+                //  event"?
+
                 if(!Objects.equals(followerId, nodeId))
                 {
                     replicateLog(followerId);
@@ -820,6 +851,9 @@ public class RaftNode {
      */
     public OperationStatus checkOperationStatus(final Operation operation)
     {
+        // TODO: consider removing this function and performing this
+        //  operation within the raft's thread, not the broker's thread
+
         // NOTE: THIS FUNCTION IS CALLED FROM BrokerController'S THREAD
         // ALL MEMBER VARIABLES USED HERE MUST BE THREAD SAFE
 
