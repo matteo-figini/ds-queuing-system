@@ -34,32 +34,6 @@ public class RaftNode {
     /** Number of nodes in the raft network */
     private final Integer NUM_NODES;
 
-    /**
-     * Value of the election timeout for the candidate (how much time the election
-     * phase has before aborting). Expressed in milliseconds.
-     */
-    private static final Integer ELECTION_OUT_OF_TIME_TIMEOUT_CANDIDATE = 5000;
-
-    /**
-     * Value of the election timeout for the followers: how much time the election can take
-     * before the followers start suspecting a candidate's failure. Expressed in milliseconds.
-     * Gives an extra second with respect to the candidate value to take into account
-     * connection slowness.
-     */
-    private final Integer ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER;
-
-    private final Integer ASK_LEADER_REQUEST_TIMEOUT;
-
-    /**
-     * Min value of the range used to generate random timeouts. Expressed in milliseconds.
-     */
-    private static final Integer TIMEOUT_MIN_RAND = 300;
-
-    /**
-     * Max value of the range used to generate random timeouts. Expressed in milliseconds.
-     */
-    private static final Integer TIMEOUT_MAX_RAND = 1800;
-
     /** Used to distinguish node*/
     private final String nodeId;
 
@@ -115,35 +89,7 @@ public class RaftNode {
      */
     private final BrokerController brokerController;
 
-    /* ---------- TIMEOUT CHECKERS ---------- */
-
-    /**
-     * Checks if the election process took too much time. In that case
-     * the election is aborted.
-     */
-    private TimeoutChecker timeoutHandlerElectionCandidate;
-
-    /**
-     * Checks if the election process of another node (the candidate node)
-     * takes too much time, in which case it might have failed. In that case
-     * the node tries to start another election.
-     */
-    private TimeoutChecker timeoutHandlerElectionFollower;
-
-    /**
-     * This timeout is started when the leader disconnection event is received.
-     * In that case we start a random timeout, the first node to trigger that
-     * timeout starts an election. The others should receive the vote request,
-     * stop their timeout checkers and vote for the candidate.
-     */
-    private TimeoutChecker timeoutHandlerLeaderDisconnected;
-
-    /**
-     * This timeout is started when a node is joining an already running
-     * network. It sends a AskLeaderRequest message to all active brokers,
-     * then it waits for a response.
-     */
-    private TimeoutChecker timeoutHandlerAskLeaderRequest;
+    private RaftTimeoutManager timeoutManager;
 
     /**
      * Class constructor.
@@ -162,20 +108,7 @@ public class RaftNode {
         this.brokerController = brokerController;
         this.NUM_NODES = numNodes;
 
-        Random rand = new Random();
-        // Obtain a number between [0 - 49].
-        final int randTimeout = rand.nextInt(TIMEOUT_MIN_RAND, TIMEOUT_MAX_RAND);
-        ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER = ELECTION_OUT_OF_TIME_TIMEOUT_CANDIDATE + randTimeout + 500;
-        ASK_LEADER_REQUEST_TIMEOUT = ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER;
-
-        timeoutHandlerLeaderDisconnected = new TimeoutChecker(eventsQueue, randTimeout + 500,
-                new Message(MessageType.START_ELECTION), TimeoutChecker.Mode.EXPLICIT);
-        timeoutHandlerElectionFollower = new TimeoutChecker(eventsQueue, ELECTION_OUT_OF_TIME_TIMEOUT_FOLLOWER + randTimeout,
-                new Message(MessageType.ELECTION_OUT_OF_TIME_FOLLOWER), TimeoutChecker.Mode.EXPLICIT);
-        timeoutHandlerAskLeaderRequest = new TimeoutChecker(eventsQueue, ASK_LEADER_REQUEST_TIMEOUT,
-                new Message(MessageType.LEADER_DISCONNECTED), TimeoutChecker.Mode.EXPLICIT);
-        timeoutHandlerElectionCandidate = new TimeoutChecker(eventsQueue, ELECTION_OUT_OF_TIME_TIMEOUT_CANDIDATE,
-                new Message(MessageType.ELECTION_OUT_OF_TIME_CANDIDATE), TimeoutChecker.Mode.EXPLICIT);
+        timeoutManager = new RaftTimeoutManager(eventsQueue);
 
         // Init backup
         diskBackupHandler = new LogFilesHandler<>(nodeId + "log.dat", nodeId + "status.dat");
@@ -196,6 +129,7 @@ public class RaftNode {
             synchronized (mutexLog) { diskBackupHandler.saveLog(log); }
         }
 
+        // TODO: Just start heartbeat timeout
         if(!netAlreadyStarted)
         {
             // If the network isn't already running there is no leader,
@@ -341,14 +275,18 @@ public class RaftNode {
 
     private void askLeader()
     {
+        // TODO: remove this method
+
         brokerController.sendMessage(BrokerNetwork.ALL_BROKERS_CMD, (Message) new AskLeaderRequest(nodeId));
 
         // Start timeout
-        timeoutHandlerAskLeaderRequest.startNewTimeout();
+        timeoutManager.startAskLeaderRequestTimeout();
     }
 
     private void onAskLeaderRequest(final AskLeaderRequest msg)
     {
+        // TODO: remove this method
+
         final AskLeaderResponse response = new AskLeaderResponse(currentLeader);
 
         brokerController.sendMessage(msg.sender, response);
@@ -364,6 +302,8 @@ public class RaftNode {
 
     private void onAskLeaderResponse(final AskLeaderResponse msg)
     {
+        // TODO: remove this method
+
         if(currentLeader != null)
         {
             // This node has already received the info from
@@ -372,7 +312,7 @@ public class RaftNode {
         }
 
         // Stop the timeout for the request
-        timeoutHandlerAskLeaderRequest.disableAndRemove();
+        timeoutManager.stopTimeout();
 
         currentLeader = msg.leaderName;
         brokerController.setLeaderBroker(currentLeader);
@@ -391,10 +331,12 @@ public class RaftNode {
      */
     private void onLeaderDisconnection()
     {
+        // TODO: remove this method
+
         // The leader has disconnected. I start a timeout (which is random)
         // that might trigger an election if this node doesn't receive
         // a vote request before the timeout fires.
-        timeoutHandlerLeaderDisconnected.startNewTimeout();
+        timeoutManager.startLeaderDisconnectedTimeout();
 
         currentLeader = null;
     }
@@ -435,8 +377,8 @@ public class RaftNode {
         brokerController.sendMessage(BrokerNetwork.ALL_BROKERS_CMD, voteMsg);
 
         // Start election timer
-        timeoutHandlerElectionCandidate.disableAndRemove(); // Might be already active, restart
-        timeoutHandlerElectionCandidate.startNewTimeout();
+        timeoutManager.stopTimeout();
+        timeoutManager.startElectionTimeoutCandidate();
     }
 
     /**
@@ -495,20 +437,23 @@ public class RaftNode {
 
         if(vote)
         {
-            // The vote is positive
+            // TODO: check if actually needed, compare with original algo
+
+            // The vote is positive (check, this part was probably added
+            // by me)
 
             // Another node has started an election, and it can
             // be a leader, this node doesn't have to start
             // another election
-            timeoutHandlerLeaderDisconnected.disableAndRemove();
 
             // If an election was already running is now
             // stopped -> disable the timeout
-            timeoutHandlerElectionCandidate.disableAndRemove();
+
+            timeoutManager.stopTimeout();
 
             // Start an election timeout, which checks if the election takes too
             // much time (the candidate might have failed)
-            timeoutHandlerElectionFollower.startNewTimeout();
+            timeoutManager.startElectionTimeoutFollower();
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
@@ -518,6 +463,9 @@ public class RaftNode {
 
         if(!vote && currentRole != NodeState.LEADER)
         {
+            // TODO: probably added by me, check if it
+            //  is actually needed
+
             // The vote is negative, for some reason the
             // candidate is not suitable -> I try myself
             // TODO: should I check if this node wasn't already
@@ -544,10 +492,7 @@ public class RaftNode {
             if(votesReceived.size() >= (NUM_NODES + 1) / 2)
             {
                 // Cancel election timer
-                timeoutHandlerElectionCandidate.disableAndRemove();
-                timeoutHandlerElectionFollower.disableAndRemove();
-                timeoutHandlerAskLeaderRequest.disableAndRemove();
-                timeoutHandlerLeaderDisconnected.disableAndRemove();
+                timeoutManager.stopTimeout();
 
                 // Election won
                 System.out.println("[INFO] ELECTION WON");
@@ -585,7 +530,11 @@ public class RaftNode {
             votedFor = null;
 
             // Cancel election timer
-            timeoutHandlerElectionCandidate.disableAndRemove();
+            timeoutManager.stopTimeout();
+
+            // TODO: should I start a new timeout? leaving the node
+            //  with all timeouts stopped would prevent it to candidate
+            //  forever... not what i want
         }
 
         diskBackupHandler.saveStatus(currentTerm, votedFor, commitLength.get());
@@ -605,9 +554,9 @@ public class RaftNode {
         // Create new log item
         final LogItem newItem = new LogItem(newOperation, currentTerm);
 
-        // TODO: remove this check
         if(currentRole != NodeState.LEADER)
         {
+            // TODO: is it possible that this function is called when a node isn't the leader?
             throw new RuntimeException("Error, this function should be called only on the leader node");
         }
 
@@ -642,6 +591,7 @@ public class RaftNode {
         // TODO: remove this check
         if(currentRole != NodeState.LEADER)
         {
+            // TODO: is it possible that this function is called when a node isn't the leader?
             throw new RuntimeException("Error, this function should be called only on the leader node");
         }
 
@@ -676,10 +626,7 @@ public class RaftNode {
     private void onLogRequest(final LogRequest logRequest)
     {
         // Check if there were timeouts running, stop them if needed
-        timeoutHandlerElectionFollower.disableAndRemove();
-        timeoutHandlerElectionCandidate.disableAndRemove();
-        timeoutHandlerLeaderDisconnected.disableAndRemove();
-        timeoutHandlerAskLeaderRequest.disableAndRemove();
+        timeoutManager.stopTimeout();
 
         if(logRequest.term > currentTerm)
         {
@@ -743,6 +690,8 @@ public class RaftNode {
                 {
                     // log is inconsistent, keep only until prefixLen
                     // TODO: is it correct? the slides say to keep until `prefixLen - 1` included?
+                    //  maybe this would explain why it takes multiple iterations for correcting the log
+                    //  when a leader crashes before sending an operation to its followers... check
                     log = new ArrayList<>(log.subList(0, prefixLen));
                 }
             }
@@ -805,6 +754,7 @@ public class RaftNode {
 
             // Cancel election timer
             // TODO: check, why should i stop election timer in the leader?
+            //  shouldn't i start a new follower heartbeat timeout?
 //            electionTimeoutHandler.stop();
         }
 
@@ -812,6 +762,10 @@ public class RaftNode {
 
         if(currentRole == NodeState.FOLLOWER)
         {
+            // TODO: added by me, decide what to do. Should i keep this or
+            //  start a follower heartbeat timeout as explained in the
+            //  previous todo?
+
             // We received the response from a follower
             // that has better rights to be the leader, so
             // we switched to follower...
@@ -877,6 +831,11 @@ public class RaftNode {
             // get notified by the heartbeat, but we removed it
             for(String followerId : brokerController.getBrokersConnected())
             {
+                // TODO: this was added by me, so that operations are
+                //  immediately propagated to followers... but with the
+                //  heartbeat should I just wait the next "send heartbeat
+                //  event"?
+
                 if(!Objects.equals(followerId, nodeId))
                 {
                     replicateLog(followerId);
@@ -892,6 +851,9 @@ public class RaftNode {
      */
     public OperationStatus checkOperationStatus(final Operation operation)
     {
+        // TODO: consider removing this function and performing this
+        //  operation within the raft's thread, not the broker's thread
+
         // NOTE: THIS FUNCTION IS CALLED FROM BrokerController'S THREAD
         // ALL MEMBER VARIABLES USED HERE MUST BE THREAD SAFE
 

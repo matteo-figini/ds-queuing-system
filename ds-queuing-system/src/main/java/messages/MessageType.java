@@ -23,7 +23,7 @@ public enum MessageType
     /** Leader heartbeat timeout event (followers haven't received an update from the leader). */
 //    LEADER_HEARTBEAT_TIMEOUT,
     /** Used to notify the leader that it has to send the heartbeat message to the followers. */
-//    LEADER_HEARTBEAT_NOTIFY,
+    LEADER_HEARTBEAT_NOTIFY,
     /** The actual heartbeat message sent by the leader. */
 //    LEADER_HEARTBEAT_MESSAGE,
     /** Message sent to each active follower when the socket detects the leader disconnection. */
